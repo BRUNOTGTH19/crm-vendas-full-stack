@@ -1,7 +1,9 @@
-from pydantic import BaseModel, model_validator
-from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
+from typing import List, Optional
+
+from pydantic import BaseModel, model_validator
+
 from models.sale import SaleStatus
 from schemas.sale_item import SaleItemCreate, SaleItemResponse
 
@@ -9,7 +11,7 @@ from schemas.sale_item import SaleItemCreate, SaleItemResponse
 class SaleCreate(BaseModel):
     client_id: int
     sale_date: date
-    status: SaleStatus
+    status: SaleStatus = SaleStatus.pending
     due_date: Optional[date] = None
     items: List[SaleItemCreate]
 

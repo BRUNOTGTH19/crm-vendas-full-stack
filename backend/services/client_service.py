@@ -43,3 +43,31 @@ def list_clients(db: Session, search: str | None = None) -> list[Client]:
         term = normalize_name(search)
         query = query.filter(Client.name_normalized.like(f"%{term}%"))
     return query.order_by(Client.full_name).all()
+
+
+def get_client(db: Session, client_id: int) -> Client | None:
+    return db.query(Client).filter(Client.id == client_id).first()
+
+
+def update_client(db: Session, client: Client, data: ClientUpdate) -> Client:
+    name_normalized = normalize_name(data.full_name)
+    existing = (
+        db.query(Client)
+        .filter(Client.name_normalized == name_normalized, Client.id != client.id)
+        .first()
+    )
+    if existing:
+        raise ValueError("Já existe um cliente com esse nome")
+
+    client.full_name = data.full_name.strip()
+    client.name_normalized = name_normalized
+    db.commit()
+    db.refresh(client)
+    return client
+
+
+def delete_client(db: Session, client: Client) -> None:
+    if client.sales:
+        raise ValueError("Cliente possui vendas registradas e não pode ser excluído")
+    db.delete(client)
+    db.commit()
