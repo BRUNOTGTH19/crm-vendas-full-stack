@@ -17,6 +17,8 @@ candidates = (
             User.email.like("smoke_%@crm.com"),
             User.email.like("sales_smoke_%@crm.com"),
             User.email.like("e2e_%@test.com"),
+            User.email.like("faseA_%@test.com"),
+            User.email.like("diag%@test.com"),
             User.email == "teste1@crm.com",
         )
     )

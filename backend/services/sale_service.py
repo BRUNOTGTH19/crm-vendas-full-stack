@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import cache
 from sqlalchemy.orm import Session
 
 from models.client import Client
@@ -39,6 +40,10 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
     db.add(sale)
     db.commit()
     db.refresh(sale)
+
+    # Invalida caches (doc oficial 2.3 passo 5)
+    cache.invalidate_dashboard_cache()
+    cache.invalidate_client_sales_cache(data.client_id)
     return sale
 
 
@@ -67,4 +72,8 @@ def mark_sale_paid(db: Session, sale_id: int) -> Sale:
     sale.due_date = None
     db.commit()
     db.refresh(sale)
+
+    # Invalida caches (doc oficial 2.3 passo 5)
+    cache.invalidate_dashboard_cache()
+    cache.invalidate_client_sales_cache(sale.client_id)
     return sale

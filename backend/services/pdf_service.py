@@ -81,3 +81,70 @@ def generate_invoice_pdf(sale: Sale, client: Client) -> bytes:
         lines.append((10, 50, f"Vencimento: {sale.due_date.strftime('%d/%m/%Y')}"))
     return _build_pdf(lines)
 
+
+# ---------------------------------------------------------------------------
+# Relatórios em PDF com ReportLab (doc oficial 1.2 e 2.5 — gerados sob
+# demanda, em memória, sem persistência de arquivos em disco)
+# ---------------------------------------------------------------------------
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+PRIMARY_COLOR = colors.HexColor("#26215C")  # roxo — doc 3.4
+
+
+def build_report_pdf(
+    title: str,
+    subtitle: str,
+    headers: list[str],
+    rows: list[list[str]],
+    footers: list[str] | None = None,
+) -> bytes:
+    """Monta um relatório tabular em PDF e retorna os bytes em memória."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        title=title,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+    styles = getSampleStyleSheet()
+
+    story: list = [
+        Paragraph(title, styles["Title"]),
+        Spacer(1, 2 * mm),
+        Paragraph(subtitle, styles["Normal"]),
+        Spacer(1, 6 * mm),
+    ]
+
+    table_data = [headers] + (rows if rows else [["—"] + [""] * (len(headers) - 1)])
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY_COLOR),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#999999")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F1F8")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(table)
+
+    if footers:
+        story.append(Spacer(1, 6 * mm))
+        for line in footers:
+            story.append(Paragraph(f"<b>{line}</b>", styles["Normal"]))
+
+    doc.build(story)
+    return buffer.getvalue()
+

@@ -1,6 +1,9 @@
 from typing import Optional
 
+import cache
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -44,7 +47,18 @@ def get_client_sales(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_dependency),
 ):
-    return list_sales(db, client_id=client_id)
+    """Histórico de vendas do cliente (cache Redis de 2 min, doc 4.2)."""
+    cache_key = f"sales:client:{client_id}"
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        return JSONResponse(content=cached)
+
+    sales = list_sales(db, client_id=client_id)
+    data = jsonable_encoder(
+        [SaleResponse.model_validate(s) for s in sales]
+    )
+    cache.set_json(cache_key, data, cache.CLIENT_SALES_TTL)
+    return data
 
 
 @router.get("/{sale_id}", response_model=SaleResponse)

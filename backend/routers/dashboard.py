@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import cache
 from database import get_db
 from middleware.auth_middleware import get_current_user_dependency
 from models.client import Client
@@ -19,7 +20,19 @@ def get_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_dependency),
 ):
-    """Métricas gerais para a tela inicial do CRM."""
+    """Métricas gerais para a tela inicial do CRM (cache Redis de 5 min, doc 4.2)."""
+    month_key = f"dashboard:{date.today():%Y-%m}"
+    cached = cache.get_json(month_key)
+    if cached is not None:
+        return cached
+
+    data = _compute_dashboard(db)
+
+    cache.set_json(month_key, data, cache.DASHBOARD_TTL)
+    return data
+
+
+def _compute_dashboard(db: Session) -> dict:
     today = date.today()
     first_day_month = today.replace(day=1)
 

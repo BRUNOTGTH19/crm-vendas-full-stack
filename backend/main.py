@@ -1,10 +1,22 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from routers import auth, clients, sales, dashboard, queue, reports
+from scheduler import scheduler as reminder_scheduler
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Inicia o APScheduler de lembretes ao subir e encerra ao desligar (doc 2.4)."""
+    reminder_scheduler.start()
+    yield
+    reminder_scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
