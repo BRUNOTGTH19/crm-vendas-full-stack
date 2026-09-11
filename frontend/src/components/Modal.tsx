@@ -13,15 +13,15 @@ export function Modal({ title, onClose, children }: ModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-lg rounded-2xl bg-[#26215C] shadow-2xl shadow-black/40"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <h2 className="text-lg font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
-            aria-label="Cerrar"
+            className="text-zinc-400 hover:text-zinc-200 text-2xl leading-none"
+            aria-label="Fechar"
           >
             ×
           </button>

@@ -60,15 +60,15 @@ export function NewSale() {
 
     const emptyProduct = items.some((it) => !it.product_name.trim());
     if (emptyProduct) {
-      setError("Completá el nombre de cada producto (o quitá las filas vacías).");
+      setError("Preencha o nome de cada produto (ou remova as linhas vazias).");
       return;
     }
     if (!clientId) {
-      setError("Seleccioná un cliente.");
+      setError("Selecione um cliente.");
       return;
     }
     if (status === "pending" && !dueDate) {
-      setError("La fecha de vencimiento es obligatoria para ventas pendientes.");
+      setError("A data de vencimento é obrigatória para vendas pendentes.");
       return;
     }
 
@@ -147,102 +147,102 @@ function NewSalePage(props: {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Nueva venta</h1>
-        <a href="#/sales" className="text-sm text-slate-500 hover:underline">
-          ← Volver a ventas
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Nova venda</h1>
+        <a href="#/sales" className="text-sm text-[#FAC775] hover:underline">
+          ← Voltar para vendas
         </a>
       </div>
 
       {ok ? (
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6">
-          <p className="text-emerald-700 font-medium">
-            Venta registrada correctamente.
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6">
+          <p className="font-medium text-emerald-300">
+            Venda registrada com sucesso.
           </p>
           <a
             href="#/sales"
-            className="mt-4 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            className="mt-4 inline-block rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
           >
-            Ver ventas
+            Ver vendas
           </a>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
+              <label className="mb-1 block text-sm font-medium text-zinc-300">Cliente</label>
               <select
                 required
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm bg-white focus:border-sky-500 focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
               >
-                <option value="">Seleccionar…</option>
+                <option value="" className="bg-[#1A1A1A]">Selecionar…</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
+                  <option key={c.id} value={String(c.id)} className="bg-[#1A1A1A]">
                     {c.full_name}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de venta</label>
+              <label className="mb-1 block text-sm font-medium text-zinc-300">Data da venda</label>
               <input
                 type="date"
                 required
                 value={saleDate}
                 onChange={(e) => setSaleDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
+              <label className="mb-1 block text-sm font-medium text-zinc-300">Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as SaleStatus)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm bg-white focus:border-sky-500 focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
               >
-                <option value="pending">Pendiente (a cobrar)</option>
-                <option value="paid">Pagada</option>
+                <option value="pending" className="bg-[#1A1A1A]">Pendente (a cobrar)</option>
+                <option value="paid" className="bg-[#1A1A1A]">Paga</option>
               </select>
             </div>
             {status === "pending" && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Vencimiento (obligatorio)
+                <label className="mb-1 block text-sm font-medium text-zinc-300">
+                  Vencimento (obrigatório)
                 </label>
                 <input
                   type="date"
                   required
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
                 />
               </div>
             )}
           </div>
 
-          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-x-auto">
+          <div className="overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-200">
-                  <th className="px-3 py-2.5">Producto</th>
-                  <th className="px-3 py-2.5 w-24 text-right">Cant.</th>
-                  <th className="px-3 py-2.5 w-32 text-right">P. unitario (R$)</th>
+                <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                  <th className="px-3 py-2.5">Produto</th>
+                  <th className="px-3 py-2.5 w-24 text-right">Qtd.</th>
+                  <th className="px-3 py-2.5 w-32 text-right">P. unit. (R$)</th>
                   <th className="px-3 py-2.5 text-right">Subtotal</th>
                   <th className="px-3 py-2.5 w-16"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it) => (
-                  <tr key={it.key} className="border-t border-slate-100">
+                  <tr key={it.key} className="border-t border-white/5">
                     <td className="px-3 py-2">
                       <input
                         type="text"
                         value={it.product_name}
                         onChange={(e) => onUpdateItem(it.key, { product_name: e.target.value })}
-                        placeholder="Nombre del producto"
-                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-sky-500 focus:outline-none"
+                        placeholder="Nome do produto"
+                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -252,7 +252,7 @@ function NewSalePage(props: {
                         step={1}
                         value={it.quantity}
                         onChange={(e) => onUpdateItem(it.key, { quantity: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm focus:border-sky-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -263,10 +263,10 @@ function NewSalePage(props: {
                         value={it.unit_price}
                         onChange={(e) => onUpdateItem(it.key, { unit_price: e.target.value })}
                         placeholder="0.00"
-                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm focus:border-sky-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
-                    <td className="px-3 py-2 text-right font-medium text-slate-700">
+                    <td className="px-3 py-2 text-right font-medium text-[#FAC775]">
                       {fmtMoney(toNum(it.quantity) * toNum(it.unit_price))}
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -274,8 +274,8 @@ function NewSalePage(props: {
                         type="button"
                         onClick={() => onRemoveItem(it.key)}
                         disabled={items.length === 1}
-                        className="text-red-400 hover:text-red-600 text-lg leading-none"
-                        aria-label="Quitar fila"
+                        className="text-lg leading-none text-red-400 hover:text-red-300 disabled:opacity-40"
+                        aria-label="Remover linha"
                       >
                         ×
                       </button>
@@ -290,18 +290,18 @@ function NewSalePage(props: {
             <button
               type="button"
               onClick={onAddItem}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+              className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5"
             >
-              + Agregar producto
+              + Adicionar produto
             </button>
             <div className="ml-auto text-right">
-              <div className="text-xs text-slate-400 uppercase">Total</div>
-              <div className="text-2xl font-bold text-slate-900">{fmtMoney(total)}</div>
+              <div className="text-xs text-zinc-400 uppercase">Total</div>
+              <div className="text-2xl font-bold text-[#FAC775]">{fmtMoney(total)}</div>
             </div>
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
           )}
@@ -309,16 +309,16 @@ function NewSalePage(props: {
           <div className="flex justify-end gap-3">
             <a
               href="#/sales"
-              className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-200"
+              className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
             >
               Cancelar
             </a>
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-full bg-[#534AB7] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
             >
-              {busy ? "Guardando…" : "Registrar venta"}
+              {busy ? "Salvando…" : "Registrar venda"}
             </button>
           </div>
         </form>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, downloadSaleReceipt } from "../lib/api.ts";
 import { Modal } from "../components/Modal.tsx";
+import { StatusBadge } from "../components/StatusBadge.tsx";
 import { fmtDate, fmtMoney } from "../lib/format.ts";
 import type { Client, Sale, SaleStatus } from "../types.ts";
 
@@ -52,7 +53,7 @@ export function Sales() {
   }, [reloadTick, status, clientId]);
 
   async function pay(sale: Sale) {
-    if (!window.confirm(`¿Marcar la venta #${sale.id} como pagada?`)) return;
+    if (!window.confirm(`Marcar a venda #${sale.id} como paga?`)) return;
     setBusy(true);
     setError("");
     try {
@@ -122,35 +123,35 @@ function SalesPage(props: {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Ventas</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Vendas</h1>
         <a
           href="#/sales/new"
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
         >
-          + Nueva venta
+          + Nova venda
         </a>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as "" | SaleStatus)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-sky-500 focus:outline-none"
+          className="rounded-xl border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none"
         >
-          <option value="">Todos los estados</option>
-          <option value="pending">Pendientes</option>
-          <option value="paid">Pagadas</option>
+          <option value="" className="bg-[#1A1A1A]">Todos os status</option>
+          <option value="pending" className="bg-[#1A1A1A]">Pendentes</option>
+          <option value="paid" className="bg-[#1A1A1A]">Pagas</option>
         </select>
 
         <select
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:border-sky-500 focus:outline-none"
+          className="rounded-xl border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none"
         >
-          <option value="">Todos los clientes</option>
+          <option value="" className="bg-[#1A1A1A]">Todos os clientes</option>
           {clients.map((c) => (
-            <option key={c.id} value={String(c.id)}>
+            <option key={c.id} value={String(c.id)} className="bg-[#1A1A1A]">
               {c.full_name}
             </option>
           ))}
@@ -160,62 +161,54 @@ function SalesPage(props: {
           type="button"
           onClick={onReload}
           disabled={busy}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+          className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
         >
-          {busy ? "Cargando…" : "Actualizar"}
+          {busy ? "Carregando…" : "Atualizar"}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {error}
         </div>
       )}
 
       {busy && sales.length === 0 ? (
-        <p className="text-slate-500 text-sm">Cargando…</p>
+        <p className="text-sm text-zinc-400">Carregando…</p>
       ) : sales.length === 0 ? (
-        <p className="text-slate-500 text-sm">No hay ventas con esos filtros.</p>
+        <p className="text-sm text-zinc-400">Nenhuma venda com esses filtros.</p>
       ) : (
-        <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <div className="overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-200">
+              <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Fecha</th>
+                <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Vence</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
               {sales.map((s) => (
-                <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-medium text-slate-700">#{s.id}</td>
-                  <td className="px-4 py-2.5 text-slate-800">
+                <tr key={s.id} className="border-t border-white/5 hover:bg-white/5">
+                  <td className="px-4 py-2.5 font-medium text-zinc-300">#{s.id}</td>
+                  <td className="px-4 py-2.5 text-white">
                     {clientName.get(s.client_id) ?? `Cliente ${s.client_id}`}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-500">{fmtDate(s.sale_date)}</td>
-                  <td className="px-4 py-2.5 font-medium text-slate-800">{fmtMoney(s.total)}</td>
+                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(s.sale_date)}</td>
+                  <td className="px-4 py-2.5 font-medium text-white">{fmtMoney(s.total)}</td>
                   <td className="px-4 py-2.5">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        s.status === "paid"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {s.status === "paid" ? "Paga" : "Pendiente"}
-                    </span>
+                    <StatusBadge status={s.status} />
                   </td>
-                  <td className="px-4 py-2.5 text-slate-500">{fmtDate(s.due_date)}</td>
+                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(s.due_date)}</td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => onView(s)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
+                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/5"
                     >
                       Ver
                     </button>
@@ -224,7 +217,7 @@ function SalesPage(props: {
                         type="button"
                         onClick={() => onPay(s)}
                         disabled={busy}
-                        className="ml-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        className="ml-1.5 rounded-full border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
                       >
                         Pagar
                       </button>
@@ -233,7 +226,7 @@ function SalesPage(props: {
                       type="button"
                       onClick={() => onPdf(s.id)}
                       disabled={busy}
-                      className="ml-1.5 rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                      className="ml-1.5 rounded-full border border-[#534AB7] px-3 py-1.5 text-xs font-medium text-[#B9B2F5] hover:bg-[#534AB7]/20 disabled:opacity-50"
                     >
                       PDF
                     </button>
@@ -246,42 +239,42 @@ function SalesPage(props: {
       )}
 
       {viewing && (
-        <Modal title={`Venta #${viewing.id}`} onClose={() => setViewing(null)}>
+        <Modal title={`Venda #${viewing.id}`} onClose={() => setViewing(null)}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-slate-400">Cliente</dt>
-            <dd className="text-slate-800">{clientName.get(viewing.client_id) ?? "—"}</dd>
-            <dt className="text-slate-400">Fecha</dt>
-            <dd className="text-slate-800">{fmtDate(viewing.sale_date)}</dd>
-            <dt className="text-slate-400">Estado</dt>
-            <dd className="text-slate-800 capitalize">{viewing.status}</dd>
-            <dt className="text-slate-400">Vencimiento</dt>
-            <dd className="text-slate-800">{fmtDate(viewing.due_date)}</dd>
+            <dt className="text-zinc-400">Cliente</dt>
+            <dd className="text-white">{clientName.get(viewing.client_id) ?? "—"}</dd>
+            <dt className="text-zinc-400">Data</dt>
+            <dd className="text-white">{fmtDate(viewing.sale_date)}</dd>
+            <dt className="text-zinc-400">Status</dt>
+            <dd className="text-white capitalize">{viewing.status}</dd>
+            <dt className="text-zinc-400">Vencimento</dt>
+            <dd className="text-white">{fmtDate(viewing.due_date)}</dd>
           </dl>
           <table className="mt-4 w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-200">
-                <th className="px-3 py-2">Producto</th>
-                <th className="px-3 py-2 text-right">Cant.</th>
+              <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                <th className="px-3 py-2">Produto</th>
+                <th className="px-3 py-2 text-right">Qtd.</th>
                 <th className="px-3 py-2 text-right">P. unit.</th>
                 <th className="px-3 py-2 text-right">Subtotal</th>
               </tr>
             </thead>
             <tbody>
               {viewing.items.map((it) => (
-                <tr key={it.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 text-slate-700">{it.product_name}</td>
-                  <td className="px-3 py-2 text-right text-slate-500">{it.quantity}</td>
-                  <td className="px-3 py-2 text-right text-slate-500">{fmtMoney(it.unit_price)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-slate-800">{fmtMoney(it.subtotal)}</td>
+                <tr key={it.id} className="border-t border-white/5">
+                  <td className="px-3 py-2 text-zinc-200">{it.product_name}</td>
+                  <td className="px-3 py-2 text-right text-zinc-400">{it.quantity}</td>
+                  <td className="px-3 py-2 text-right text-zinc-400">{fmtMoney(it.unit_price)}</td>
+                  <td className="px-3 py-2 text-right font-medium text-[#FAC775]">{fmtMoney(it.subtotal)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200">
-                <td colSpan={3} className="px-3 py-2.5 text-right font-semibold text-slate-700">
+              <tr className="border-t border-white/10">
+                <td colSpan={3} className="px-3 py-2.5 text-right font-semibold text-zinc-300">
                   Total
                 </td>
-                <td className="px-3 py-2.5 text-right text-base font-bold text-slate-900">
+                <td className="px-3 py-2.5 text-right text-base font-bold text-white">
                   {fmtMoney(viewing.total)}
                 </td>
               </tr>

@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
+/* Tema escuro — doc oficial 3.4: dark mode com roxo (#26215C/#534AB7)
+   e âmbar (#FAC775/#BA7517) como cores de destaque. */
 :root {
-  color-scheme: light;
-}
-
-body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background-color: #f1f5f9;
+  color-scheme: dark;
 }
 
 html,
 body {
   height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #1a1a1a;
+  color: #f3f2f7;
 }

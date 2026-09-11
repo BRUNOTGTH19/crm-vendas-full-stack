@@ -7,6 +7,8 @@ import { Dashboard } from "./pages/Dashboard.tsx";
 import { Clients } from "./pages/Clients.tsx";
 import { Sales } from "./pages/Sales.tsx";
 import { NewSale } from "./pages/NewSale.tsx";
+import { Queue } from "./pages/Queue.tsx";
+import { History } from "./pages/History.tsx";
 import { Reports } from "./pages/Reports.tsx";
 
 function currentPath(): string {
@@ -38,6 +40,8 @@ export function App(): ReactNode {
     ["/clients", <Clients />],
     ["/sales", <Sales />],
     ["/sales/new", <NewSale />],
+    ["/queue", <Queue />],
+    ["/history", <History />],
     ["/reports", <Reports />],
   ]);
 
