@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import "./index.css";
 
 // Registrar la PWA (solo en http/https, no en file://)
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
