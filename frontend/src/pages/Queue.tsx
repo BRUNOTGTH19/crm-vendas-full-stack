@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, downloadSaleReceipt } from "../lib/api.ts";
 import { fmtDate, fmtMoney, todayISO } from "../lib/format.ts";
 import { PDFButton } from "../components/PDFButton.tsx";
+import { PaymentModal, paymentPayload } from "../components/PaymentModal.tsx";
 import type { Client, Sale } from "../types.ts";
 
 type ChargeSituation = "vencida" | "hoje" | "a-vencer";
@@ -30,6 +31,7 @@ export function Queue() {
   const [clients, setClients] = useState<Client[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [paying, setPaying] = useState<Sale | null>(null);
 
   const clientName = new Map(clients.map((c) => [c.id, c.full_name]));
 
@@ -55,11 +57,16 @@ export function Queue() {
   }, [load]);
 
   async function receive(sale: Sale) {
-    if (!window.confirm(`Dar baixa na cobrança da venda #${sale.id}?`)) return;
+    setError("");
+    setPaying(sale);
+  }
+
+  async function confirmPayment(saleId: number, amountPaid: string, newDueDate: string | null) {
     setBusy(true);
     setError("");
     try {
-      await api.patch(`/sales/${sale.id}/pay`);
+      await api.post("/payments", paymentPayload(saleId, amountPaid, newDueDate));
+      setPaying(null);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
@@ -122,8 +129,10 @@ export function Queue() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-[#FAC775]">{fmtMoney(s.total)}</div>
-                  <div className="text-xs text-zinc-400">Vence {fmtDate(s.due_date)}</div>
+                  <div className="text-lg font-bold text-[#FAC775]">{fmtMoney(s.remaining)}</div>
+                  <div className="text-xs text-zinc-400">
+                    Saldo de {fmtMoney(s.total)} · Vence {fmtDate(s.due_date)}
+                  </div>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SITUATION_STYLE[sit]}`}
@@ -145,6 +154,15 @@ export function Queue() {
             );
           })}
         </div>
+      )}
+
+      {paying && (
+        <PaymentModal
+          sale={paying}
+          busy={busy}
+          onConfirm={confirmPayment}
+          onClose={() => setPaying(null)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, downloadSaleReceipt } from "../lib/api.ts";
 import { Modal } from "../components/Modal.tsx";
+import { PaymentModal, paymentPayload } from "../components/PaymentModal.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
 import { fmtDate, fmtMoney } from "../lib/format.ts";
 import type { Client, Sale, SaleStatus } from "../types.ts";
@@ -11,6 +12,7 @@ export function Sales() {
   const [status, setStatus] = useState<"" | SaleStatus>("");
   const [clientId, setClientId] = useState("");
   const [viewing, setViewing] = useState<Sale | null>(null);
+  const [paying, setPaying] = useState<Sale | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -53,11 +55,16 @@ export function Sales() {
   }, [reloadTick, status, clientId]);
 
   async function pay(sale: Sale) {
-    if (!window.confirm(`Marcar a venda #${sale.id} como paga?`)) return;
+    setError("");
+    setPaying(sale);
+  }
+
+  async function confirmPayment(saleId: number, amountPaid: string, newDueDate: string | null) {
     setBusy(true);
     setError("");
     try {
-      await api.patch(`/sales/${sale.id}/pay`);
+      await api.post("/payments", paymentPayload(saleId, amountPaid, newDueDate));
+      setPaying(null);
       await loadSales();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
@@ -76,26 +83,37 @@ export function Sales() {
   }
 
   return (
-    <SalesPage
-      busy={busy}
-      error={error}
-      sales={sales}
-      clientName={clientName}
-      status={status}
-      setStatus={setStatus}
-      clientId={clientId}
-      setClientId={setClientId}
-      clients={clients}
-      onReload={async () => {
-        setReloadTick(reloadTick + 1);
-        setStatus(status);
-      }}
-      onView={setViewing}
-      onPay={pay}
-      onPdf={downloadPdf}
-      viewing={viewing}
-      setViewing={setViewing}
-    />
+    <>
+      <SalesPage
+        busy={busy}
+        error={error}
+        sales={sales}
+        clientName={clientName}
+        status={status}
+        setStatus={setStatus}
+        clientId={clientId}
+        setClientId={setClientId}
+        clients={clients}
+        onReload={async () => {
+          setReloadTick(reloadTick + 1);
+          setStatus(status);
+        }}
+        onView={setViewing}
+        onPay={pay}
+        onPdf={downloadPdf}
+        viewing={viewing}
+        setViewing={setViewing}
+      />
+
+      {paying && (
+        <PaymentModal
+          sale={paying}
+          busy={busy}
+          onConfirm={confirmPayment}
+          onClose={() => setPaying(null)}
+        />
+      )}
+    </>
   );
 }
 

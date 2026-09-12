@@ -19,12 +19,14 @@ export interface Client {
   id: number;
   full_name: string;
   name_normalized: string;
+  whatsapp: string | null;
   created_by_id: number;
   created_at: string;
 }
 
 export interface ClientInput {
   full_name: string;
+  whatsapp?: string | null;
 }
 
 export type SaleStatus = "paid" | "pending";
@@ -45,6 +47,8 @@ export interface Sale {
   sale_date: string;
   status: SaleStatus;
   total: string;
+  amount_paid: string;
+  remaining: string;
   due_date: string | null;
   created_at: string;
   items: SaleItem[];
