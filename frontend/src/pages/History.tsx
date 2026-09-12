@@ -35,7 +35,8 @@ export function History() {
   }, []);
 
   const selected = clients.find((c) => String(c.id) === clientId);
-  const total = sales.reduce((acc, s) => acc + parseFloat(s.total), 0);
+  // Soma o saldo devedor (remaining) — vendas com pagamento parcial não devem contar o valor já recebido.
+  const total = sales.reduce((acc, s) => acc + parseFloat(s.remaining), 0);
 
   return (
     <div>
@@ -62,7 +63,7 @@ export function History() {
         </select>
         {selected && (
           <span className="text-sm text-zinc-400">
-            {sales.length} venda(s) · Total{" "}
+            {sales.length} venda(s) · Saldo devedor{" "}
             <span className="font-semibold text-[#FAC775]">{fmtMoney(total)}</span>
           </span>
         )}

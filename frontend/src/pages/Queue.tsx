@@ -75,7 +75,7 @@ export function Queue() {
     }
   }
 
-  const total = sales.reduce((acc, s) => acc + parseFloat(s.total), 0);
+  const total = sales.reduce((acc, s) => acc + parseFloat(s.remaining), 0);
   const ordered = [...sales].sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
   const overdue = sales.filter((s) => situationOf(s) === "vencida").length;
 

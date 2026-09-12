@@ -45,7 +45,7 @@ def _compute_dashboard(db: Session) -> dict:
         .scalar()
     )
     revenue_pending = (
-        db.query(func.coalesce(func.sum(Sale.total), 0))
+        db.query(func.coalesce(func.sum(Sale.remaining), 0))
         .filter(Sale.status == SaleStatus.pending)
         .scalar()
     )

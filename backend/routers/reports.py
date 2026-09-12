@@ -170,7 +170,7 @@ def cashflow_report_pdf(
         .all()
     )
     paid_total = sum(float(s.total) for s in sales if s.status == SaleStatus.paid)
-    pending_total = sum(float(s.total) for s in sales if s.status == SaleStatus.pending)
+    pending_total = sum(float(s.remaining) for s in sales if s.status == SaleStatus.pending)
     rows = [
         [
             f"#{s.id}",
@@ -211,12 +211,13 @@ def sales_report(
     )
     total = sum(s.total for s in sales)
     paid_total = sum(s.total for s in sales if s.status == SaleStatus.paid)
+    pending_total = sum(s.remaining for s in sales if s.status == SaleStatus.pending)
     return {
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "sales_count": len(sales),
         "total": float(total),
         "paid_total": float(paid_total),
-        "pending_total": float(total - paid_total),
+        "pending_total": float(pending_total),
         "sales": [
             {
                 "id": s.id,
