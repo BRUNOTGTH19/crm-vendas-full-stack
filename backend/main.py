@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import auth, clients, sales, dashboard, queue, reports
+from routers import auth, clients, sales, dashboard, queue, reports, payments
 from scheduler import scheduler as reminder_scheduler
 
 
@@ -32,6 +32,7 @@ app.include_router(sales.router)
 app.include_router(dashboard.router)
 app.include_router(queue.router)
 app.include_router(reports.router)
+app.include_router(payments.router)
 
 
 @app.get("/")

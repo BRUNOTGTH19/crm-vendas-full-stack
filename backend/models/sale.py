@@ -20,8 +20,13 @@ class Sale(Base):
     sale_date = Column(Date, nullable=False)
     status = Column(Enum(SaleStatus), nullable=False, default=SaleStatus.pending)
     total = Column(Numeric(10, 2), nullable=False, default=0)
+    amount_paid = Column(Numeric(10, 2), nullable=False, default=0)
+    remaining = Column(Numeric(10, 2), nullable=False, default=0)
+
     due_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    payments = relationship("Payment", back_populates="sale", cascade="all, delete-orphan")
 
     client = relationship("Client", back_populates="sales")
     user = relationship("User", back_populates="sales")

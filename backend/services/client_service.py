@@ -29,6 +29,7 @@ def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
     client = Client(
         full_name=data.full_name.strip(),
         name_normalized=name_normalized,
+        whatsapp=(data.whatsapp or "").strip() or None,
         created_by_id=user_id,
     )
     db.add(client)
@@ -61,6 +62,7 @@ def update_client(db: Session, client: Client, data: ClientUpdate) -> Client:
 
     client.full_name = data.full_name.strip()
     client.name_normalized = name_normalized
+    client.whatsapp = (data.whatsapp or "").strip() or None
     db.commit()
     db.refresh(client)
     return client

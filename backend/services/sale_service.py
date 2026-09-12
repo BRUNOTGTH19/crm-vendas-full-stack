@@ -34,6 +34,7 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
         sale_date=data.sale_date,
         status=data.status,
         total=total,
+        remaining=total,
         due_date=data.due_date,
         items=items,
     )
@@ -69,6 +70,8 @@ def mark_sale_paid(db: Session, sale_id: int) -> Sale:
     if not sale:
         raise ValueError("Venda não encontrada")
     sale.status = SaleStatus.paid
+    sale.amount_paid = sale.total
+    sale.remaining = Decimal("0.00")
     sale.due_date = None
     db.commit()
     db.refresh(sale)

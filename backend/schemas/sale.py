@@ -29,6 +29,8 @@ class SaleResponse(BaseModel):
     sale_date: date
     status: SaleStatus
     total: Decimal
+    amount_paid: Decimal
+    remaining: Decimal
     due_date: Optional[date]
     created_at: datetime
     items: List[SaleItemResponse]

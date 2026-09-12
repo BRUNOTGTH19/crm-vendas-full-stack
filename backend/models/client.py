@@ -11,6 +11,7 @@ class Client(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String(150), nullable=False)
     name_normalized = Column(String(150), unique=True, nullable=False, index=True)
+    whatsapp = Column(String(20), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
