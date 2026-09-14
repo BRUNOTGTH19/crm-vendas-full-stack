@@ -1,8 +1,11 @@
 """Agendador de lembretes de cobrança com APScheduler (doc oficial, seção 2.4).
 
 Um job diário às 08h busca todas as vendas pendentes cuja data de cobrança
-(due_date) seja igual à data atual e registra os IDs no Redis
+(due_date) vence hoje OU já venceu e registra os IDs no Redis
 (pending:reminders), para notificar o usuário responsável pela venda.
+
+Esses IDs alimentam a central de cobranças (``GET /collections/reminders``),
+que monta a mensagem personalizada de cobrança pronta para envio no WhatsApp.
 """
 from datetime import date
 
@@ -15,7 +18,10 @@ from models.sale import Sale, SaleStatus
 
 
 def check_due_charges() -> int:
-    """Verifica cobranças que vencem hoje e registra lembretes. Retorna a contagem."""
+    """Verifica cobranças vencidas ou que vencem hoje e registra lembretes.
+
+    Retorna a quantidade de vendas sinalizadas.
+    """
     today = date.today()
     db = SessionLocal()
     try:
@@ -23,7 +29,8 @@ def check_due_charges() -> int:
             db.query(Sale)
             .filter(
                 Sale.status == SaleStatus.pending,
-                Sale.due_date == today,
+                Sale.due_date.isnot(None),
+                Sale.due_date <= today,
             )
             .all()
         )

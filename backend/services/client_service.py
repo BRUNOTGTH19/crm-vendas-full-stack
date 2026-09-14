@@ -3,7 +3,7 @@ import unicodedata
 from sqlalchemy.orm import Session
 
 from models.client import Client
-from schemas.client import ClientCreate
+from schemas.client import ClientCreate, ClientUpdate
 
 
 def normalize_name(name: str) -> str:

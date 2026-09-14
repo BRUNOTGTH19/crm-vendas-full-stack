@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, downloadSaleReceipt } from "../lib/api.ts";
+import { api, ApiError, downloadSaleReceipt, getCollectionReminders } from "../lib/api.ts";
 import { fmtDate, fmtMoney, todayISO } from "../lib/format.ts";
 import { PDFButton } from "../components/PDFButton.tsx";
 import { PaymentModal, paymentPayload } from "../components/PaymentModal.tsx";
+import { CollectionModal } from "../components/CollectionModal.tsx";
 import type { Client, Sale } from "../types.ts";
 
 type ChargeSituation = "vencida" | "hoje" | "a-vencer";
@@ -32,6 +33,8 @@ export function Queue() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [paying, setPaying] = useState<Sale | null>(null);
+  const [collecting, setCollecting] = useState<Sale | null>(null);
+  const [dueCount, setDueCount] = useState(0);
 
   const clientName = new Map(clients.map((c) => [c.id, c.full_name]));
 
@@ -39,12 +42,14 @@ export function Queue() {
     setBusy(true);
     setError("");
     try {
-      const [pending, allClients] = await Promise.all([
+      const [pending, allClients, reminders] = await Promise.all([
         api.get<Sale[]>("/sales?status=pending"),
         api.get<Client[]>("/clients"),
+        getCollectionReminders(),
       ]);
       setSales(pending);
       setClients(allClients);
+      setDueCount(reminders.length);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
     } finally {
@@ -107,6 +112,17 @@ export function Queue() {
         </div>
       )}
 
+      {dueCount > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#FAC775]/40 bg-[#FAC775]/10 px-4 py-3 text-sm text-[#FAC775]">
+          <span aria-hidden>🔔</span>
+          <span>
+            <span className="font-semibold">{dueCount}</span> cobrança(s) vencida(s)
+            ou vencendo hoje. Use <span className="font-semibold">Cobrar</span> para
+            enviar a mensagem personalizada no WhatsApp.
+          </span>
+        </div>
+      )}
+
       {busy && sales.length === 0 ? (
         <p className="text-sm text-zinc-400">Carregando…</p>
       ) : ordered.length === 0 ? (
@@ -142,6 +158,14 @@ export function Queue() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setCollecting(s)}
+                    disabled={busy}
+                    className="rounded-full bg-[#FAC775]/90 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] hover:bg-[#FAC775] disabled:opacity-50"
+                  >
+                    Cobrar
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => receive(s)}
                     disabled={busy}
                     className="rounded-full bg-emerald-500/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
@@ -162,6 +186,14 @@ export function Queue() {
           busy={busy}
           onConfirm={confirmPayment}
           onClose={() => setPaying(null)}
+        />
+      )}
+
+      {collecting && (
+        <CollectionModal
+          sale={collecting}
+          clientName={clientName.get(collecting.client_id) ?? `Cliente ${collecting.client_id}`}
+          onClose={() => setCollecting(null)}
         />
       )}
     </div>

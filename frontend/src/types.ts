@@ -104,6 +104,33 @@ export interface SalesReport {
   sales: RecentSale[];
 }
 
+export type ChargeSituation = "vencida" | "hoje" | "a-vencer";
+
+export interface CollectionReminder {
+  sale_id: number;
+  client_id: number;
+  client_name: string;
+  whatsapp: string | null;
+  situation: ChargeSituation;
+  amount: string;
+  due_date: string | null;
+  scheduled: boolean;
+}
+
+export interface CollectionMessage {
+  sale_id: number;
+  client_id: number;
+  client_name: string;
+  whatsapp: string | null;
+  whatsapp_digits: string | null;
+  has_phone: boolean;
+  amount: string;
+  due_date: string | null;
+  situation: ChargeSituation;
+  message: string;
+  wa_link: string | null;
+}
+
 export interface ClientReportRow {
   client_id: number;
   client_name: string;
