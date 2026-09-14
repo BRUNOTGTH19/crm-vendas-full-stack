@@ -1,5 +1,6 @@
-# crm-vendas-full-stack
-CRM de vendas em PWA — backend **FastAPI** + frontend **React**, com fila de cobranzas, dashboard e relatórios.
+# CRM Vendas Full Stack
+
+CRM de vendas em PWA — backend **FastAPI** + frontend **React**, com fila de cobranças, dashboard e relatórios.
 
 ## Estrutura
 
@@ -10,7 +11,7 @@ frontend/  PWA React + Vite + TypeScript + Tailwind CSS
 
 ## Backend
 
-Requisitos: MySQL 8, Redis, Python 3.14 (venv `.venv` na raíz do repo — o `backend/venv` está incompleto).
+Requisitos: MySQL 8, Redis, Python 3.12+ (venv `.venv` na raíz do repo — o `backend/venv` está incompleto).
 
 ```bash
 # a partir da raíz
@@ -20,7 +21,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 - Documentação interativa: <http://127.0.0.1:8000/docs>
-- Config em `backend/.env` (MySQL e Redis).
+- Config em `backend/.env` (MySQL e Redis). Veja o modelo em `backend/.env.example`.
 - Testes funcionais: `python smoke_test.py`, `python smoke_test_sales.py`,
   `python smoke_test_payments.py`, `python smoke_test_collections.py` (com TestClient)
   e `python smoke_test_e2e.py` (requiere o servidor em execução).
@@ -65,9 +66,81 @@ npm run dev        # http://127.0.0.1:5173  (faz proxy /api -> 127.0.0.1:8000)
 npm run build      # build de produção em frontend/dist
 ```
 
-Em producción, definir `VITE_API_URL` com a URL do backend (por padrão usa `/api`).
+Em produção, definir `VITE_API_URL` com a URL do backend (por padrão usa `/api`).
+Veja o modelo em `frontend/.env.example`.
 A PWA incluye `manifest.json`, ícono e `sw.js` (cache-first para estáticos, network-first para a API).
 
 ## Usuarios
 
 Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) já existente na base local.
+
+---
+
+# Deploy (100% gratuito, sem cartão)
+
+## ⚠️ Importante — conta obrigatória
+
+Todos os cadastros devem ser feitos com o e-mail **brunodesousa.ti@gmail.com**
+ou com a conta GitHub **BRUNOTGTH19** (que está vinculada a esse e-mail).
+**Não usar nenhuma outra conta.**
+
+Stack de hospedagem (todos gratuitos e sem cartão de crédito):
+
+| Serviço | Papel | Cadastro |
+| --- | --- | --- |
+| Vercel | Frontend (PWA) | GitHub |
+| Render | Backend (FastAPI) | GitHub |
+| Clever Cloud | MySQL | GitHub |
+| Upstash | Redis | GitHub |
+| Uptime Robot | Anti-hibernação | E-mail |
+
+## 1. MySQL — Clever Cloud
+
+1. Acesse <https://clever-cloud.com>
+2. Cadastre-se com GitHub (sem cartão)
+3. Create Application → MySQL
+4. Copie as credenciais: host, port, user, password, database
+5. Monte a `DATABASE_URL`: `mysql+pymysql://user:password@host:port/dbname`
+
+## 2. Redis — Upstash
+
+1. Acesse <https://upstash.com>
+2. Cadastre-se com GitHub (sem cartão)
+3. Create Database → Redis → região São Paulo
+4. Copie a `REDIS_URL` (começa com `rediss://`)
+
+## 3. Backend — Render
+
+1. Acesse <https://render.com>
+2. Cadastre-se com GitHub (sem cartão)
+3. New Web Service → conectar repositório `BRUNOTGTH19/crm-vendas-full-stack`
+4. Root Directory: `backend`
+5. Build Command: `pip install -r requirements.txt`
+6. Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   (também disponível no `backend/Procfile`)
+7. Adicionar variáveis de ambiente:
+   - `DATABASE_URL` (do Clever Cloud)
+   - `REDIS_URL` (do Upstash)
+   - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
+   - `ENVIRONMENT=production`
+8. Deploy — aguardar o build finalizar
+9. Rodar migrations: no Render Shell executar `alembic upgrade head`
+
+## 4. Frontend — Vercel
+
+1. Acesse <https://vercel.com>
+2. Cadastre-se com GitHub (sem cartão)
+3. New Project → importar `BRUNOTGTH19/crm-vendas-full-stack`
+4. Root Directory: `frontend`
+5. Adicionar variável de ambiente:
+   - `VITE_API_URL=https://URL-DO-SEU-BACKEND.onrender.com`
+6. Deploy
+
+## 5. Anti-hibernação — Uptime Robot
+
+1. Acesse <https://uptimerobot.com>
+2. Cadastre-se com e-mail (sem cartão)
+3. New Monitor → HTTP(s)
+4. URL: `https://URL-DO-SEU-BACKEND.onrender.com/health`
+5. Interval: 5 minutes
+6. Save
