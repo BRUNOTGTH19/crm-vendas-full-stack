@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from config import settings
 from routers import auth, clients, sales, dashboard, queue, reports, payments, collections
@@ -25,6 +26,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def force_utf8_json_charset(request: Request, call_next) -> Response:
+    """Garante `charset=utf-8` explícito nas respostas JSON.
+
+    O JSON já é UTF-8 por definição (RFC 8259), mas declarar o charset
+    evita que clientes que adivinham o encoding (ex.: PowerShell, que
+    assume latin-1 quando ausente) quebrem os emojis da mensagem de
+    cobrança. Não altera respostas binárias (ex.: download do PDF).
+    """
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if content_type.split(";")[0].strip().lower() == "application/json":
+        response.headers["content-type"] = "application/json; charset=utf-8"
+    return response
 
 app.include_router(auth.router)
 app.include_router(clients.router)

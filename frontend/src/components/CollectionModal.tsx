@@ -27,7 +27,7 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
   const [waBase, setWaBase] = useState<string | null>(null);
   const [hasPhone, setHasPhone] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busyPdf, setBusyPdf] = useState(false);
+  const [pdfState, setPdfState] = useState<"idle" | "working" | "done" | "error">("idle");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,6 +51,22 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
       .finally(() => {
         if (alive) setLoading(false);
       });
+
+    // Baixa o PDF do recibo automaticamente ao abrir a cobrança, para o
+    // usuário anexar na conversa do WhatsApp. O botão manual continua
+    // disponível como alternativa/repetição.
+    setPdfState("working");
+    downloadSaleReceipt(sale.id).then(
+      () => {
+        if (alive) setPdfState("done");
+      },
+      (err) => {
+        if (!alive) return;
+        setPdfState("error");
+        setError(err instanceof ApiError ? err.detail : String(err));
+      }
+    );
+
     return () => {
       alive = false;
     };
@@ -68,14 +84,15 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
   }
 
   async function downloadPdf() {
-    setBusyPdf(true);
+    if (pdfState === "working") return;
+    setPdfState("working");
     setError("");
     try {
       await downloadSaleReceipt(sale.id);
+      setPdfState("done");
     } catch (err) {
+      setPdfState("error");
       setError(err instanceof ApiError ? err.detail : String(err));
-    } finally {
-      setBusyPdf(false);
     }
   }
 
@@ -116,9 +133,18 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
       )}
 
       <p className="mt-2 text-xs text-zinc-400">
-        💡 O WhatsApp não permite anexar arquivos por link. Baixe o PDF e anexe-o
-        na conversa após abrir o WhatsApp.
+        💡 O WhatsApp não permite anexar arquivos por link. O PDF do recibo é
+        baixado automaticamente — anexe-o na conversa após abrir o WhatsApp.
       </p>
+
+      {pdfState === "working" && (
+        <p className="mt-2 text-xs text-zinc-400">⏳ Gerando o PDF do recibo…</p>
+      )}
+      {pdfState === "done" && (
+        <p className="mt-2 text-xs font-semibold text-emerald-300">
+          ✅ PDF baixado! Anexe-o na conversa do WhatsApp.
+        </p>
+      )}
 
       {error && (
         <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
@@ -138,10 +164,10 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
         <button
           type="button"
           onClick={downloadPdf}
-          disabled={busyPdf}
+          disabled={pdfState === "working"}
           className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
         >
-          {busyPdf ? "Gerando…" : "Baixar PDF"}
+          {pdfState === "working" ? "Gerando…" : pdfState === "done" ? "Baixar novamente" : "Baixar PDF"}
         </button>
         <button
           type="button"
