@@ -79,6 +79,17 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
             {n.label}
           </a>
         ))}
+        {/* Sair (logout local: limpa localStorage e volta ao login) */}
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] text-zinc-300"
+        >
+          <span className="text-lg" aria-hidden>
+            {"\u{1F6AA}"}
+          </span>
+          Sair
+        </button>
       </nav>
 
       <main className="px-4 pb-24 pt-6 md:px-8 lg:ml-64 lg:pb-8">{children}</main>
