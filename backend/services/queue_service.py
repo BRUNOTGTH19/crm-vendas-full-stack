@@ -6,19 +6,19 @@ from datetime import datetime, timezone
 import os
 import redis
 
-from config import settings
 from database import SessionLocal
 from models.client import Client
 from models.sale import Sale
 from services.pdf_service import generate_invoice_pdf
 
-_redis_url = os.getenv("REDIS_URL") or settings.redis_url or "redis://localhost:6379/0"
+_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 _ssl = _redis_url.startswith("rediss://")
-_queue_kwargs = {"decode_responses": False}
-if _ssl:
-    _queue_kwargs["ssl_cert_reqs"] = None
 
-redis_client = redis.Redis.from_url(_redis_url, **_queue_kwargs)
+redis_client = redis.Redis.from_url(
+    _redis_url,
+    decode_responses=False,
+    ssl_cert_reqs=None if _ssl else "required",
+)
 
 JOB_TTL_SECONDS = 3600  # jobs e PDFs expiram em 1 hora
 

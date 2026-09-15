@@ -38,11 +38,13 @@ export function getSessionUser(): User | null {
 export function setSession(token: TokenResponse): void {
   localStorage.setItem(TOKEN_KEY, token.access_token);
   localStorage.setItem(USER_KEY, JSON.stringify(token.user));
+  window.dispatchEvent(new Event("crm_auth_changed"));
 }
 
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event("crm_auth_changed"));
 }
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -92,6 +94,14 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
   }
 
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/register")) {
+      clearSession();
+      window.dispatchEvent(
+        new CustomEvent("crm_session_revoked", {
+          detail: detailFrom(data, "Sessão expirada ou revogada. Faça login novamente."),
+        })
+      );
+    }
     throw new ApiError(res.status, detailFrom(data, `Error ${res.status}`));
   }
   return data as T;

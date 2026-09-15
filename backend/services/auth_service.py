@@ -50,7 +50,7 @@ def create_session(user_id: int, access_token: str, refresh_token: str = "") -> 
             mapping={"access_token": access_token, "refresh_token": refresh_token},
         )
         redis_client.expire(_session_key(user_id), SESSION_TTL_SECONDS)
-    except redis.RedisError:
+    except Exception:
         # Redis indisponível: autenticação continua funcionando (fail-open).
         pass
 
@@ -59,14 +59,14 @@ def revoke_session(user_id: int) -> None:
     """Invalida a sessão imediatamente (logout)."""
     try:
         redis_client.delete(_session_key(user_id))
-    except redis.RedisError:
+    except Exception:
         pass
 
 
 def _session_field_valid(user_id: int, field: str, token: str) -> bool:
     try:
         saved = redis_client.hget(_session_key(user_id), field)
-    except redis.RedisError:
+    except Exception:
         return True  # fail-open: sem Redis, confia apenas no JWT
     return bool(saved) and saved == token
 
