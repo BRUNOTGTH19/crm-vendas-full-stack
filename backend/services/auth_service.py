@@ -34,10 +34,10 @@ def create_refresh_token(data: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Sessão no Redis (doc oficial 2.2 passo 5 e 4.2: session:{user_id}, TTL 8h.
-# O logout grava a flag "revoked" — em vez de deletar a chave — para que a
-# revogação seja explícita e distinguível de uma sessão ausente por evição
-# do Upstash ou falha de escrita, evitando falsos "Sessão revogada".)
+# Sessão no Redis (best-effort, apenas informativo/auditoria).
+# A AUTENTICAÇÃO É 100% JWT: a validação NÃO consulta mais o Redis.
+# O Upstash free tier (evição de chaves, conexões intermitentes) causava
+# falsos "Sessão revogada" — o JWT assinado e com expiração é suficiente.
 # ---------------------------------------------------------------------------
 
 def _session_key(user_id: int) -> str:
@@ -45,7 +45,7 @@ def _session_key(user_id: int) -> str:
 
 
 def create_session(user_id: int, access_token: str, refresh_token: str = "") -> None:
-    """Salva a sessão no Redis com TTL de 8 horas."""
+    """Salva a sessão no Redis (best-effort, TTL 8h). Não afeta a autenticação."""
     try:
         redis_client.hset(
             _session_key(user_id),
@@ -53,40 +53,17 @@ def create_session(user_id: int, access_token: str, refresh_token: str = "") -> 
         )
         redis_client.expire(_session_key(user_id), SESSION_TTL_SECONDS)
     except Exception:
-        # Redis indisponível: autenticação continua funcionando (fail-open).
+        # Redis indisponível: login continua funcionando normalmente.
         pass
 
 
 def revoke_session(user_id: int) -> None:
-    """Marca a sessão como revogada (logout), sem depender de deleção da chave."""
+    """Marca a sessão como revogada no Redis (best-effort, apenas informativo)."""
     try:
         redis_client.hset(_session_key(user_id), "revoked", "1")
         redis_client.expire(_session_key(user_id), SESSION_TTL_SECONDS)
     except Exception:
         pass
-
-
-def _session_field_valid(user_id: int, field: str, token: str) -> bool:
-    try:
-        saved = redis_client.hget(_session_key(user_id), field)
-        revoked = redis_client.hget(_session_key(user_id), "revoked")
-    except Exception:
-        return True  # fail-open: sem Redis, confia apenas no JWT
-    if revoked == "1":
-        return False  # logout explícito: revoga de verdade
-    if not saved:
-        # Sessão ausente (evição do Upstash ou falha de escrita no login):
-        # não há prova de revogação — confia apenas no JWT (fail-open).
-        return True
-    return saved == token
-
-
-def access_session_valid(user_id: int, access_token: str) -> bool:
-    return _session_field_valid(user_id, "access_token", access_token)
-
-
-def refresh_session_valid(user_id: int, refresh_token: str) -> bool:
-    return _session_field_valid(user_id, "refresh_token", refresh_token)
 
 
 def register_user(db: Session, data: UserCreate) -> User:
@@ -125,15 +102,12 @@ def login_user(db: Session, email: str, password: str) -> dict:
 
 
 def refresh_tokens(db: Session, refresh_token: str) -> dict:
-    """Valida o refresh token contra a sessão no Redis e emite novos tokens."""
+    """Valida o refresh token (apenas JWT) e emite novos tokens."""
     try:
         payload = jwt.decode(refresh_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         user_id = int(payload.get("sub"))
     except (JWTError, TypeError, ValueError):
         raise ValueError("Refresh token inválido ou expirado")
-
-    if not refresh_session_valid(user_id, refresh_token):
-        raise ValueError("Sessão revogada ou expirada. Faça login novamente.")
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -162,6 +136,5 @@ def get_current_user(db: Session, token: str) -> User:
     if not user:
         raise ValueError("Usuário não encontrado")
 
-    if not access_session_valid(user_id, token):
-        raise ValueError("Sessão revogada (logout). Faça login novamente.")
+    # Autenticação apenas JWT: sem consulta de sessão no Redis.
     return user
