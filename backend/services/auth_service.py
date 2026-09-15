@@ -35,7 +35,9 @@ def create_refresh_token(data: dict) -> str:
 
 # ---------------------------------------------------------------------------
 # Sessão no Redis (doc oficial 2.2 passo 5 e 4.2: session:{user_id}, TTL 8h.
-# O logout invalida a chave imediatamente, revogando o token antes de expirar.)
+# O logout grava a flag "revoked" — em vez de deletar a chave — para que a
+# revogação seja explícita e distinguível de uma sessão ausente por evição
+# do Upstash ou falha de escrita, evitando falsos "Sessão revogada".)
 # ---------------------------------------------------------------------------
 
 def _session_key(user_id: int) -> str:
@@ -56,9 +58,10 @@ def create_session(user_id: int, access_token: str, refresh_token: str = "") -> 
 
 
 def revoke_session(user_id: int) -> None:
-    """Invalida a sessão imediatamente (logout)."""
+    """Marca a sessão como revogada (logout), sem depender de deleção da chave."""
     try:
-        redis_client.delete(_session_key(user_id))
+        redis_client.hset(_session_key(user_id), "revoked", "1")
+        redis_client.expire(_session_key(user_id), SESSION_TTL_SECONDS)
     except Exception:
         pass
 
@@ -66,9 +69,16 @@ def revoke_session(user_id: int) -> None:
 def _session_field_valid(user_id: int, field: str, token: str) -> bool:
     try:
         saved = redis_client.hget(_session_key(user_id), field)
+        revoked = redis_client.hget(_session_key(user_id), "revoked")
     except Exception:
         return True  # fail-open: sem Redis, confia apenas no JWT
-    return bool(saved) and saved == token
+    if revoked == "1":
+        return False  # logout explícito: revoga de verdade
+    if not saved:
+        # Sessão ausente (evição do Upstash ou falha de escrita no login):
+        # não há prova de revogação — confia apenas no JWT (fail-open).
+        return True
+    return saved == token
 
 
 def access_session_valid(user_id: int, access_token: str) -> bool:
