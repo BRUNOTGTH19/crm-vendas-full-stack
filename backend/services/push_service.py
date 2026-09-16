@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from models.push_subscription import PushSubscription
+from services.vapid_service import get_vapid_keys
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +53,11 @@ def send_push_to_all(db: Session, title: str, body: str, url: str = "/#/queue") 
     Retorna quantos envios foram aceitos. Subscrições inválidas/expiradas
     (404/410) são removidas do banco.
     """
-    if not settings.vapid_private_key or not settings.vapid_public_key:
-        logger.warning("Web Push desativado: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY ausentes.")
+    # Resolve as chaves VAPID (env → banco → geração automática persistida).
+    try:
+        _, vapid_private_key = get_vapid_keys(db)
+    except Exception as exc:  # nunca derruba o job por falha de configuração
+        logger.warning("Web Push desativado: não foi possível obter as chaves VAPID: %s", exc)
         return 0
 
     payload = json.dumps({"title": title, "body": body, "url": url})
@@ -66,7 +70,7 @@ def send_push_to_all(db: Session, title: str, body: str, url: str = "/#/queue") 
                     "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
                 },
                 data=payload,
-                vapid_private_key=settings.vapid_private_key,
+                vapid_private_key=vapid_private_key,
                 vapid_claims={"sub": settings.vapid_subject},
             )
             sent += 1

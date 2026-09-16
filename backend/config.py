@@ -1,7 +1,15 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# Caminho absoluto para o .env, independente do diretório de trabalho (CWD).
+# Sem isso, iniciar o servidor de fora de `backend/` faria o pydantic-settings
+# não encontrar o arquivo e as chaves VAPID ficariam vazias.
+ENV_FILE = Path(__file__).resolve().parent / ".env"
 
 
 class Settings(BaseSettings):
+
     app_name: str = "CRM Vendas API"
     environment: str = "development"
 
@@ -36,7 +44,8 @@ class Settings(BaseSettings):
     )
 
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE)
+        env_file_encoding = "utf-8"
 
 
 settings = Settings()

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from config import settings
 from database import get_db
 from middleware.auth_middleware import get_current_user_dependency
 from models.user import User
 from services import push_service
+from services.vapid_service import get_vapid_keys
 
 router = APIRouter(prefix="/push", tags=["Push"])
 
@@ -24,14 +24,20 @@ class PushTestIn(BaseModel):
 
 
 @router.get("/vapid-key")
-def get_vapid_key():
-    """Chave pública VAPID usada pelo navegador em `applicationServerKey`."""
-    if not settings.vapid_public_key:
+def get_vapid_key(db: Session = Depends(get_db)):
+    """Chave pública VAPID usada pelo navegador em `applicationServerKey`.
+
+    As chaves vêm das variáveis de ambiente ou, se ausentes, são geradas
+    automaticamente e persistidas no banco (ver ``services.vapid_service``).
+    """
+    try:
+        public_key, _ = get_vapid_keys(db)
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Web Push não configurado no servidor (VAPID_PUBLIC_KEY ausente).",
-        )
-    return {"public_key": settings.vapid_public_key}
+            detail=f"Web Push indisponível: não foi possível obter as chaves VAPID ({exc}).",
+        ) from exc
+    return {"public_key": public_key}
 
 
 @router.post("/subscribe", status_code=status.HTTP_201_CREATED)

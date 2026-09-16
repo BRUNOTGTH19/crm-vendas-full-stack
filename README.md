@@ -123,8 +123,15 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
    - `REDIS_URL` (do Upstash)
    - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
    - `ENVIRONMENT=production`
+   - **Web Push (opcional):** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e
+     `VAPID_SUBJECT` (ex.: `mailto:admin@crm-vendas.com`). Gere o par com
+     `python gen_vapid_keys.py`. **Se não definir, o backend gera e persiste
+     as chaves automaticamente no banco na primeira chamada** — funciona sem
+     configuração manual, mas definir explicitamente é recomendado para
+     controlar a rotação das chaves.
 8. Deploy — aguardar o build finalizar
 9. Rodar migrations: no Render Shell executar `alembic upgrade head`
+   (cria as tabelas `push_subscriptions` e `app_settings`)
 
 ## 4. Frontend — Vercel
 
