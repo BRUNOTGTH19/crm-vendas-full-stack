@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { User } from "../types.ts";
-
+import { getPushState, enablePush, disablePush } from "../lib/push.ts";
 const NAV = [
   { href: "#/", label: "Painel", icon: "\u{1F4CA}" },
   { href: "#/clients", label: "Clientes", icon: "\u{1F465}" },
@@ -18,6 +18,44 @@ interface LayoutProps {
   user: User;
   onLogout: () => void;
   children: ReactNode;
+}
+
+function PushToggle() {
+  const [state, setState] = useState<"unsupported" | "denied" | "subscribed" | "unsubscribed" | "loading">("loading");
+
+  useEffect(() => {
+    getPushState().then(setState);
+  }, []);
+
+  if (state === "unsupported") return null;
+
+  const toggle = async () => {
+    try {
+      setState("loading");
+      if (state === "subscribed") {
+        await disablePush();
+      } else {
+        await enablePush();
+      }
+    } catch (err: any) {
+      alert("Erro nas notificações: " + err.message);
+    } finally {
+      getPushState().then(setState);
+    }
+  };
+
+  const isSubscribed = state === "subscribed";
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={state === "loading" || state === "denied"}
+      className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
+      title="Ativar/Desativar Notificações"
+    >
+      <span>{isSubscribed ? "🔔 Notificações Ativas" : "🔕 Notificações Desativadas"}</span>
+    </button>
+  );
 }
 
 export function Layout({ user, onLogout, children }: LayoutProps) {
@@ -50,7 +88,8 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           ))}
         </nav>
         <div className="border-t border-white/10 px-5 py-4">
-          <div className="truncate text-sm font-semibold text-white">{user.name}</div>
+          <PushToggle />
+          <div className="mt-2 truncate text-sm font-semibold text-white">{user.name}</div>
           <div className="truncate text-xs text-zinc-400">
             {user.email} · {user.role}
           </div>
@@ -79,7 +118,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
             {n.label}
           </a>
         ))}
-        {/* Sair (logout local: limpa localStorage e volta ao login) */}
+        {/* Sair (logout local) */}
         <button
           type="button"
           onClick={onLogout}
@@ -92,7 +131,13 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
         </button>
       </nav>
 
-      <main className="px-4 pb-24 pt-6 md:px-8 lg:ml-64 lg:pb-8">{children}</main>
+      {/* Top bar mobile for Push Toggle */}
+      <div className="lg:hidden flex items-center justify-between bg-[#26215C] px-4 py-3 border-b border-white/10">
+        <div className="text-lg font-bold text-white">CRM Vendas</div>
+        <PushToggle />
+      </div>
+
+      <main className="px-4 pb-24 pt-6 md:px-8 lg:ml-64 lg:pb-8 lg:pt-8">{children}</main>
     </div>
   );
 }

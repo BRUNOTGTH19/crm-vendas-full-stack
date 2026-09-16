@@ -45,6 +45,19 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
     # Invalida caches (doc oficial 2.3 passo 5)
     cache.invalidate_dashboard_cache()
     cache.invalidate_client_sales_cache(data.client_id)
+
+    # Envia push imediatamente se a venda vence hoje ou já está vencida
+    from datetime import date
+    if sale.status == SaleStatus.pending and sale.due_date and sale.due_date <= date.today():
+        from services.push_service import send_push_to_all
+        # Import local to avoid circular deps if any
+        send_push_to_all(
+            db,
+            title="🔔 Nova cobrança pendente",
+            body=f"Venda para {client.name} (R$ {sale.total}) está com vencimento para {sale.due_date.strftime('%d/%m/%Y')}!",
+            url="/#/queue"
+        )
+        
     return sale
 
 
