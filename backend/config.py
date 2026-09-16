@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 480  # 8 horas
     refresh_token_expire_days: int = 7
 
+    # --- Web Push (notificações de alerta de prazo de vendas) ---
+    # Gere o par de chaves com: python gen_vapid_keys.py
+    # A pública vai para o frontend (applicationServerKey); a privada fica aqui.
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:admin@crm-vendas.com"
+
     # --- Cobrança / WhatsApp (100% grátis, sem API paga) ---
     # Nome exibido no rodapé da mensagem de cobrança.
     company_name: str = "CRM Vendas"

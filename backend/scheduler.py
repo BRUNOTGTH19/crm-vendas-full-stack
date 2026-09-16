@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 from cache import add_pending_reminder
 from database import SessionLocal
 from models.sale import Sale, SaleStatus
+from services.push_service import send_push_to_all
 
 
 def check_due_charges() -> int:
@@ -39,6 +40,23 @@ def check_due_charges() -> int:
 
     for sale in sales:
         add_pending_reminder(sale.id)
+
+    # Envia push notification para os dispositivos inscritos (Web Push).
+    if sales:
+        db_push = SessionLocal()
+        try:
+            send_push_to_all(
+                db_push,
+                title="🔔 Alerta de cobranças",
+                body=(
+                    f"{len(sales)} cobrança(s) vencida(s) ou vencendo hoje. "
+                    "Abra o app para ver os detalhes."
+                ),
+                url="/#/queue",
+            )
+        finally:
+            db_push.close()
+
     return len(sales)
 
 
