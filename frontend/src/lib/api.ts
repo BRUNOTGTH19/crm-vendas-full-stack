@@ -63,7 +63,12 @@ function detailFrom(data: unknown, fallback: string): string {
 }
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { 
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0"
+  };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
