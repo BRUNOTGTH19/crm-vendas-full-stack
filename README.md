@@ -74,7 +74,25 @@ A PWA incluye `manifest.json`, ícono e `sw.js` (cache-first para estáticos, ne
 
 Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) já existente na base local.
 
----
+## Gestão de dados (admin)
+
+Usuários com papel **admin** têm acesso à área **Dados (admin)** (`#/admin/dados`),
+com três operações protegidas pela dependência `require_admin` (403 para não-admins):
+
+- `POST /admin/database/reset` — zera as tabelas de dados. Exige `{"confirm": true}`.
+  **Preserva a tabela `users`** (não desloga o admin). Apaga, respeitando as FKs:
+  `sale_items`, `payments`, `push_subscriptions`, `sales`, `clients`.
+- `GET /admin/database/export` — baixa um JSON consolidado (`crm_vendas_export.json`)
+  com todos os registros das tabelas de dados.
+- `POST /admin/database/import?mode=skip|overwrite` — reinsere dados do arquivo
+  exportado, validados por Pydantic. `skip` (padrão) ignora IDs existentes;
+  `overwrite` atualiza os registros existentes.
+
+Toda ação é registrada na tabela de auditoria `audit_logs` (quem, quando, o quê).
+
+Testes: `python -m pytest tests/test_admin.py` (autorização, reset com/sem
+confirmação, exportação, importação skip/overwrite e auditoria).
+
 
 # Deploy (100% gratuito, sem cartão)
 
