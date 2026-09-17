@@ -222,7 +222,67 @@ function NewSalePage(props: {
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30">
+          {/* Mobile: cards empilhados — o input do produto usa toda a largura
+              disponível e text-base (evita zoom automático no iOS). */}
+          <div className="space-y-3 sm:hidden">
+            {items.map((it) => (
+              <div key={it.key} className="rounded-3xl bg-[#26215C] p-4 shadow-lg shadow-black/30">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs uppercase text-zinc-400">Produto</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveItem(it.key)}
+                    disabled={items.length === 1}
+                    className="text-lg leading-none text-red-400 hover:text-red-300 disabled:opacity-40"
+                    aria-label="Remover linha"
+                  >
+                    ×
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={it.product_name}
+                  onChange={(e) => onUpdateItem(it.key, { product_name: e.target.value })}
+                  placeholder="Nome do produto"
+                  className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-base text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
+                />
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs uppercase text-zinc-400">Qtd.</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={it.quantity}
+                      onChange={(e) => onUpdateItem(it.key, { quantity: e.target.value })}
+                      className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-right text-base text-white focus:border-[#534AB7] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs uppercase text-zinc-400">P. unit. (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={it.unit_price}
+                      onChange={(e) => onUpdateItem(it.key, { unit_price: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-right text-base text-white focus:border-[#534AB7] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 text-right text-sm">
+                  <span className="text-zinc-400">Subtotal: </span>
+                  <span className="font-medium text-[#FAC775]">
+                    {fmtMoney(toNum(it.quantity) * toNum(it.unit_price))}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop/tablet: tabela com overflow horizontal seguro. */}
+          <div className="hidden overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30 sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
@@ -242,7 +302,7 @@ function NewSalePage(props: {
                         value={it.product_name}
                         onChange={(e) => onUpdateItem(it.key, { product_name: e.target.value })}
                         placeholder="Nome do produto"
-                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
+                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -252,7 +312,7 @@ function NewSalePage(props: {
                         step={1}
                         value={it.quantity}
                         onChange={(e) => onUpdateItem(it.key, { quantity: e.target.value })}
-                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -263,7 +323,7 @@ function NewSalePage(props: {
                         value={it.unit_price}
                         onChange={(e) => onUpdateItem(it.key, { unit_price: e.target.value })}
                         placeholder="0.00"
-                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-[#FAC775]">

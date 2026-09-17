@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
 from config import settings
-from routers import auth, clients, sales, dashboard, queue, reports, payments, collections, push
+from routers import auth, clients, sales, dashboard, queue, reports, payments, collections, push, admin
 from scheduler import scheduler as reminder_scheduler
 
 
@@ -52,6 +52,7 @@ app.include_router(reports.router)
 app.include_router(payments.router)
 app.include_router(collections.router)
 app.include_router(push.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

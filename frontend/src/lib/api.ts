@@ -217,3 +217,80 @@ export async function copyToClipboard(text: string): Promise<void> {
     el.remove();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Admin — gestão de dados (reset/export/import)
+// ---------------------------------------------------------------------------
+
+export interface AdminResetResult {
+  cleared: Record<string, number>;
+  preserved: string[];
+}
+
+export interface AdminImportResult {
+  mode: "skip" | "overwrite";
+  inserted: Record<string, number>;
+  skipped: Record<string, number>;
+  updated: Record<string, number>;
+}
+
+/** Zera as tabelas de dados (exige confirm=true). Preserva os usuários. */
+export function adminResetDatabase(): Promise<AdminResetResult> {
+  return api.post<AdminResetResult>("/admin/database/reset", { confirm: true });
+}
+
+/** Baixa o JSON consolidado de todos os dados (download no navegador). */
+export async function adminExportDatabase(): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(API_BASE + "/admin/database/export", { headers });
+  if (!res.ok) {
+    let detail = `Erro ${res.status}`;
+    try {
+      detail = detailFrom(await res.json(), detail);
+    } catch {
+      /* mantém mensagem padrão */
+    }
+    throw new ApiError(res.status, detail);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "crm_vendas_export.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Importa um arquivo JSON exportado. mode: "skip" (padrão) ou "overwrite". */
+export async function adminImportDatabase(
+  file: File,
+  mode: "skip" | "overwrite" = "skip"
+): Promise<AdminImportResult> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(
+    API_BASE + `/admin/database/import?mode=${encodeURIComponent(mode)}`,
+    { method: "POST", headers, body: form }
+  );
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { detail: text };
+    }
+  }
+  if (!res.ok) throw new ApiError(res.status, detailFrom(data, `Erro ${res.status}`));
+  return data as AdminImportResult;
+}

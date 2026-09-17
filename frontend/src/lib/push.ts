@@ -8,7 +8,7 @@
  *
  * O service worker (/sw.js) exibe a notificação quando o backend envia o push.
  */
-import { api, ApiError } from "./api.ts";
+import { api, ApiError, getToken } from "./api.ts";
 
 const PUSH_ENABLED_KEY = "crm_push_enabled";
 
@@ -53,7 +53,19 @@ export async function enablePush(): Promise<void> {
     throw new Error("Este navegador não suporta notificações push.");
   }
 
+  // A subscrição é persistida no backend e exige o usuário autenticado.
+  // Sem o token, a API responde 401 ("Token não informado"). Validamos antes
+  // para exibir uma mensagem clara em vez do erro cru do backend.
+  if (!getToken()) {
+    throw new Error("Sua sessão expirou. Faça login novamente e tente ativar as notificações.");
+  }
+
   const permission = await Notification.requestPermission();
+  if (permission === "denied") {
+    throw new Error(
+      "Permissão de notificação bloqueada no navegador. Abra as configurações do site e permita as notificações."
+    );
+  }
   if (permission !== "granted") {
     throw new Error("Permissão de notificação não concedida.");
   }
@@ -73,6 +85,11 @@ export async function enablePush(): Promise<void> {
   const keys = (json.keys ?? {}) as { p256dh?: string; auth?: string };
   if (!keys.p256dh || !keys.auth) {
     throw new Error("Subscrição inválida (chaves ausentes).");
+  }
+
+  // Recheca a sessão: o token pode ter sido limpo durante o fluxo (ex.: 401).
+  if (!getToken()) {
+    throw new Error("Sua sessão expirou. Faça login novamente e tente ativar as notificações.");
   }
 
   await api.post("/push/subscribe", {
