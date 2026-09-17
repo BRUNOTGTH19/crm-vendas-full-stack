@@ -75,7 +75,7 @@ def register_user(db: Session, data: UserCreate) -> User:
         name=data.name,
         email=data.email,
         password_hash=hash_password(data.password),
-        role=data.role,
+        role="user",
     )
     db.add(user)
     db.commit()

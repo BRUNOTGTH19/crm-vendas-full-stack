@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     app_name: str = "CRM Vendas API"
     environment: str = "development"
+    allow_database_reset: bool = False
 
     database_url: str
     redis_url: str

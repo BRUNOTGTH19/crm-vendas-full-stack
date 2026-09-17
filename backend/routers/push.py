@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -11,10 +11,20 @@ from services.vapid_service import get_vapid_keys
 router = APIRouter(prefix="/push", tags=["Push"])
 
 
-class PushSubscribeIn(BaseModel):
-    endpoint: str
-    p256dh: str
-    auth: str
+class PushEndpointIn(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=500)
+
+    @field_validator("endpoint")
+    @classmethod
+    def validate_endpoint(cls, value: str) -> str:
+        if HttpUrl(value).scheme != "https":
+            raise ValueError("O endpoint push deve usar HTTPS.")
+        return value
+
+
+class PushSubscribeIn(PushEndpointIn):
+    p256dh: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_\-]+=*$")
+    auth: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_\-]+=*$")
 
 
 class PushTestIn(BaseModel):
@@ -53,14 +63,29 @@ def subscribe(
     return {"id": sub.id, "endpoint": sub.endpoint}
 
 
+@router.post("/status")
+def subscription_status(
+    data: PushEndpointIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dependency),
+):
+    from models.push_subscription import PushSubscription
+
+    exists = db.query(PushSubscription.id).filter(
+        PushSubscription.endpoint == data.endpoint,
+        PushSubscription.user_id == current_user.id,
+    ).first()
+    return {"subscribed": exists is not None}
+
+
 @router.post("/unsubscribe")
 def unsubscribe(
-    data: PushSubscribeIn,
+    data: PushEndpointIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_dependency),
 ):
     """Remove a subscrição push deste dispositivo."""
-    removed = push_service.remove_subscription(db, endpoint=data.endpoint)
+    removed = push_service.remove_subscription(db, endpoint=data.endpoint, user_id=current_user.id)
     return {"removed": removed}
 
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Literal
 from datetime import datetime
 from models.user import UserRole
 
@@ -8,7 +8,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    role: Optional[UserRole] = UserRole.user
+    role: Literal["user"] = "user"
 
 
 class UserLogin(BaseModel):

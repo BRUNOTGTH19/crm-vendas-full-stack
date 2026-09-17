@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from cache import invalidate_data_cache
 from models.audit_log import AuditLog
 from models.client import Client
 from models.payment import Payment
@@ -34,8 +35,7 @@ def log_action(db: Session, user_id: int | None, action: str, detail: str) -> Au
     """Registra uma ação administrativa na tabela de auditoria."""
     entry = AuditLog(user_id=user_id, action=action, detail=detail)
     db.add(entry)
-    db.commit()
-    db.refresh(entry)
+    db.flush()
     return entry
 
 
@@ -94,7 +94,6 @@ def reset_data(db: Session, user_id: int | None) -> dict[str, int]:
     )
     counts["sales"] = db.query(Sale).delete(synchronize_session=False)
     counts["clients"] = db.query(Client).delete(synchronize_session=False)
-    db.commit()
 
     log_action(
         db,
@@ -102,6 +101,8 @@ def reset_data(db: Session, user_id: int | None) -> dict[str, int]:
         "database_reset",
         json.dumps({"cleared": counts, "preserved": ["users"]}, ensure_ascii=False),
     )
+    db.commit()
+    invalidate_data_cache()
     return counts
 
 
@@ -127,12 +128,15 @@ def import_data(
     def apply(model, row, counters_prefix: str):
         obj = db.get(model, row.id)
         if obj is None:
-            data = row.model_dump(exclude={"created_at"})
+            data = row.model_dump(exclude_none=True)
             db.add(model(**data))
             inserted[counters_prefix] += 1
             return
         if mode == "overwrite":
-            for field, value in row.model_dump(exclude={"id", "created_at"}).items():
+            values = row.model_dump(exclude={"id"})
+            if values.get("created_at") is None:
+                values.pop("created_at", None)
+            for field, value in values.items():
                 setattr(obj, field, value)
             updated[counters_prefix] += 1
         else:
@@ -153,7 +157,7 @@ def import_data(
     for row in payload.tables.push_subscriptions:
         apply(PushSubscription, row, "push_subscriptions")
 
-    db.commit()
+    db.flush()
 
     log_action(
         db,
@@ -164,4 +168,6 @@ def import_data(
             ensure_ascii=False,
         ),
     )
+    db.commit()
+    invalidate_data_cache()
     return ImportResult(mode=mode, inserted=inserted, skipped=skipped, updated=updated)
