@@ -73,3 +73,11 @@ def get_pending_reminders() -> set[int]:
         return {int(v) for v in redis_client.smembers(PENDING_REMINDERS_KEY)}
     except redis.RedisError:
         return set()
+
+
+def invalidate_data_cache() -> None:
+    """Remove somente dados derivados do CRM; preserva sessões e outros apps."""
+    for pattern in ("dashboard:*", "sales:client:*", "pdf_job:*", "pdf_file:*"):
+        delete_pattern(pattern)
+    delete_key(PENDING_REMINDERS_KEY)
+

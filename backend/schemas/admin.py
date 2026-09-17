@@ -7,7 +7,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool, model_validator
+from models.sale import SaleStatus
 
 
 class ClientExport(BaseModel):
@@ -24,7 +25,7 @@ class SaleExport(BaseModel):
     client_id: int
     user_id: int
     sale_date: date
-    status: str
+    status: SaleStatus
     total: Decimal
     amount_paid: Decimal
     remaining: Decimal
@@ -71,9 +72,18 @@ class DataTables(BaseModel):
 class ExportPayload(BaseModel):
     """Documento completo exportado por GET /admin/database/export."""
 
-    version: int = 1
+    version: Literal[1] = 1
     exported_at: datetime
     tables: DataTables
+
+    @model_validator(mode="after")
+    def unique_ids(self):
+        for name in type(self.tables).model_fields:
+            rows = getattr(self.tables, name)
+            ids = [row.id for row in rows]
+            if any(value <= 0 for value in ids) or len(ids) != len(set(ids)):
+                raise ValueError(f"IDs inválidos ou repetidos em {name}")
+        return self
 
 
 class ImportResult(BaseModel):
@@ -89,7 +99,7 @@ class ResetRequest(BaseModel):
     `confirm` precisa ser exatamente `true` para evitar reset acidental.
     """
 
-    confirm: bool = False
+    confirm: StrictBool = False
 
 
 class ResetResult(BaseModel):

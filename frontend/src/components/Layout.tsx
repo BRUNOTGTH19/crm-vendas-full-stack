@@ -27,8 +27,13 @@ function PushToggle() {
   const [state, setState] = useState<"unsupported" | "denied" | "subscribed" | "unsubscribed" | "loading">("loading");
   const [feedback, setFeedback] = useState("");
 
+  const refreshState = () => getPushState().then(setState).catch((err: unknown) => {
+    setState("unsubscribed");
+    setFeedback(err instanceof Error ? err.message : "Não foi possível verificar as notificações.");
+  });
+
   useEffect(() => {
-    getPushState().then(setState);
+    void refreshState();
   }, []);
 
   if (state === "unsupported") return null;
@@ -48,7 +53,7 @@ function PushToggle() {
       setFeedback(message);
       alert(message);
     } finally {
-      getPushState().then(setState);
+      await refreshState();
     }
   };
 
@@ -129,7 +134,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
       </aside>
 
       {/* Bottom bar mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/10 bg-[#26215C]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around overflow-x-auto border-t border-white/10 bg-[#26215C]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {BOTTOM_NAV.map((n) => (
           <a
             key={n.href}
@@ -158,8 +163,11 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
       </nav>
 
       {/* Top bar mobile for Push Toggle */}
-      <div className="lg:hidden flex items-center justify-between bg-[#26215C] px-4 py-3 border-b border-white/10">
+      <div className="lg:hidden flex flex-wrap items-center justify-between gap-2 bg-[#26215C] px-4 py-3 border-b border-white/10">
         <div className="text-lg font-bold text-white">CRM Vendas</div>
+        {user.role === "admin" && (
+          <a href={ADMIN_NAV.href} className="text-sm text-[#FAC775]">Dados (admin)</a>
+        )}
         <PushToggle />
       </div>
 

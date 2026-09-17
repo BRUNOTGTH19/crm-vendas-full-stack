@@ -37,9 +37,11 @@ def save_subscription(
     return sub
 
 
-def remove_subscription(db: Session, endpoint: str) -> bool:
-    """Remove a subscrição de um dispositivo (ex.: usuário desativou alertas)."""
-    sub = db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+def remove_subscription(db: Session, endpoint: str, user_id: int) -> bool:
+    """Remove somente uma subscrição pertencente ao usuário autenticado."""
+    sub = db.query(PushSubscription).filter(
+        PushSubscription.endpoint == endpoint, PushSubscription.user_id == user_id
+    ).first()
     if not sub:
         return False
     db.delete(sub)
