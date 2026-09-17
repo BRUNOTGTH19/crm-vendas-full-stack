@@ -14,6 +14,9 @@ const NAV = [
 // Bottom bar mobile: itens principais (doc 3.1 — Layout com bottom bar)
 const BOTTOM_NAV = NAV.filter((n) => n.href !== "#/history");
 
+// Item extra de administração (gestão de dados), visível só para admins.
+const ADMIN_NAV = { href: "#/admin/dados", label: "Dados (admin)", icon: "\u{1F5C4}" };
+
 interface LayoutProps {
   user: User;
   onLogout: () => void;
@@ -22,6 +25,7 @@ interface LayoutProps {
 
 function PushToggle() {
   const [state, setState] = useState<"unsupported" | "denied" | "subscribed" | "unsubscribed" | "loading">("loading");
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     getPushState().then(setState);
@@ -30,6 +34,7 @@ function PushToggle() {
   if (state === "unsupported") return null;
 
   const toggle = async () => {
+    setFeedback("");
     try {
       setState("loading");
       if (state === "subscribed") {
@@ -37,24 +42,43 @@ function PushToggle() {
       } else {
         await enablePush();
       }
-    } catch (err: any) {
-      alert("Erro nas notificações: " + err.message);
+    } catch (err) {
+      // Mensagem amigável: distingue permissão negada de sessão expirada.
+      const message = err instanceof Error ? err.message : String(err);
+      setFeedback(message);
+      alert(message);
     } finally {
       getPushState().then(setState);
     }
   };
 
   const isSubscribed = state === "subscribed";
+  const label =
+    state === "denied"
+      ? "🔕 Notificações bloqueadas"
+      : isSubscribed
+        ? "🔔 Notificações Ativas"
+        : "🔕 Notificações Desativadas";
 
   return (
-    <button
-      onClick={toggle}
-      disabled={state === "loading" || state === "denied"}
-      className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
-      title="Ativar/Desativar Notificações"
-    >
-      <span>{isSubscribed ? "🔔 Notificações Ativas" : "🔕 Notificações Desativadas"}</span>
-    </button>
+    <div className="flex flex-col items-start gap-1">
+      <button
+        onClick={toggle}
+        disabled={state === "loading" || state === "denied"}
+        className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
+        title="Ativar/Desativar Notificações"
+      >
+        <span>{label}</span>
+      </button>
+      {state === "denied" && (
+        <span className="px-2 text-[10px] text-[#FAC775]">
+          Permita notificações nas configurações do navegador.
+        </span>
+      )}
+      {feedback && state !== "denied" && (
+        <span className="px-2 text-[10px] text-red-300">{feedback}</span>
+      )}
+    </div>
   );
 }
 
@@ -62,6 +86,8 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
   const current = window.location.hash.replace(/^#/, "") || "/";
 
   const isActive = (href: string) => current.split("?")[0] === href.replace("#", "");
+
+  const navItems = user.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
 
   return (
     <div className="min-h-screen bg-[#1A1A1A] text-zinc-100">
@@ -72,7 +98,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           <div className="mt-1 text-xs text-zinc-400">PWA · vendas e cobranças</div>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-3">
-          {NAV.map((n) => (
+          {navItems.map((n) => (
             <a
               key={n.href}
               href={n.href}
