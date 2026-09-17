@@ -3,8 +3,8 @@
 Cobrem: acesso sem permissão de admin (403), reset com/sem confirmação,
 exportação e importação (modos skip/overwrite) e registro de auditoria.
 
-Usam o TestClient do FastAPI contra o banco configurado (mesmo padrão dos
-smoke tests do projeto). Os dados criados são limpos ao final.
+Usam SQLite em memória com foreign keys e serviços externos simulados
+(conftest.py). Nenhuma conexão com o banco configurado é realizada.
 """
 from datetime import date, datetime
 
@@ -40,7 +40,12 @@ def _login(email: str) -> dict:
 @pytest.fixture(scope="module")
 def admin_headers():
     email = f"admin_{datetime.now().strftime('%H%M%S%f')}@crm.com"
-    _register(email, role="admin")
+    _register(email)
+    # Administradores são provisionados fora do cadastro público.
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email).one()
+        user.role = "admin"
+        db.commit()
     headers = _login(email)
     yield headers
     _cleanup_user(email)
@@ -242,6 +247,20 @@ def test_import_invalid_file_is_rejected(admin_headers):
         headers=admin_headers,
     )
     assert r.status_code == 422
+
+
+def test_export_logs_audit(admin_headers):
+    before = _count_action("database_export")
+    client.get("/admin/database/export", headers=admin_headers)
+    assert _count_action("database_export") == before + 1
+
+
+def _count_action(action: str) -> int:
+    db = SessionLocal()
+    try:
+        return db.query(AuditLog).filter(AuditLog.action == action).count()
+    finally:
+        db.close()
 
 
 def test_audit_log_written(admin_headers):
