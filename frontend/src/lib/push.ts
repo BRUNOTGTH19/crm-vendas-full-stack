@@ -44,7 +44,9 @@ export async function getPushState(): Promise<
   if (Notification.permission === "denied") return "denied";
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
-  return sub ? "subscribed" : "unsubscribed";
+  if (!sub || !getToken()) return "unsubscribed";
+  const { subscribed } = await api.post<{ subscribed: boolean }>("/push/status", { endpoint: sub.endpoint });
+  return subscribed ? "subscribed" : "unsubscribed";
 }
 
 /** Pede permissão, cria a subscrição e registra no backend. */
@@ -83,7 +85,7 @@ export async function enablePush(): Promise<void> {
 
   const json = sub.toJSON();
   const keys = (json.keys ?? {}) as { p256dh?: string; auth?: string };
-  if (!keys.p256dh || !keys.auth) {
+  if (!json.endpoint || !keys.p256dh || !keys.auth) {
     throw new Error("Subscrição inválida (chaves ausentes).");
   }
 
@@ -111,7 +113,7 @@ export async function disablePush(): Promise<void> {
       await api.post("/push/unsubscribe", { endpoint: json.endpoint });
     } catch (err) {
       // Se a sessão expirou etc., ainda removemos localmente.
-      if (!(err instanceof ApiError)) throw err;
+      if (!(err instanceof ApiError) || err.status !== 401) throw err;
     }
     await sub.unsubscribe();
   }

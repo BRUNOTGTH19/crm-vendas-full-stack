@@ -1,8 +1,8 @@
-/* Service Worker de la PWA "CRM Vendas" — cache-first para estáticos, network-first para API. */
-const CACHE = "crm-vendas-cache-v2";
+/* Service Worker: somente arquivos públicos estáticos são armazenados offline. */
+const CACHE = "crm-vendas-cache-v3";
 
 self.addEventListener("install", () => {
-  self.skipWaiting = true;
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

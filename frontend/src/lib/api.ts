@@ -6,7 +6,7 @@ import type { CollectionMessage, CollectionReminder, TokenResponse, User } from 
  * VITE_API_URL con la URL completa del backend.
  */
 const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
+  (import.meta.env?.VITE_API_URL as string | undefined) ?? "/api";
 
 const TOKEN_KEY = "crm_token";
 const USER_KEY = "crm_user";
