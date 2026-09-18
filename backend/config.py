@@ -1,5 +1,7 @@
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 # Caminho absoluto para o .env, independente do diretório de trabalho (CWD).
@@ -28,6 +30,17 @@ class Settings(BaseSettings):
     vapid_public_key: str = ""
     vapid_private_key: str = ""
     vapid_subject: str = "mailto:admin@crm-vendas.com"
+
+    # Zero preserva a regra atual: hoje e atrasadas. Ex.: 1 inclui amanhã.
+    reminder_days_before: int = Field(default=0, ge=0, le=30)
+    reminder_hour: int = Field(default=8, ge=0, le=23)
+    reminder_timezone: str = "UTC"
+
+    @field_validator("reminder_timezone")
+    @classmethod
+    def valid_reminder_timezone(cls, value: str) -> str:
+        ZoneInfo(value)
+        return value
 
     # --- Cobrança / WhatsApp (100% grátis, sem API paga) ---
     # Nome exibido no rodapé da mensagem de cobrança.

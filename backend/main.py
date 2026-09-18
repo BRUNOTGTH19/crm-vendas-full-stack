@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -5,14 +6,33 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
 from config import settings
-from routers import auth, clients, sales, dashboard, queue, reports, payments, collections, push, admin
+from routers import (
+    admin,
+    auth,
+    clients,
+    collections,
+    dashboard,
+    payments,
+    push,
+    queue,
+    reports,
+    sales,
+)
 from scheduler import scheduler as reminder_scheduler
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Inicia o APScheduler de lembretes ao subir e encerra ao desligar (doc 2.4)."""
     reminder_scheduler.start()
+    job = reminder_scheduler.get_job("pending-reminders")
+    logging.getLogger(__name__).info(
+        "reminder_scheduler_started timezone=%s days_before=%s trigger=%s next_run=%s",
+        settings.reminder_timezone, settings.reminder_days_before, job.trigger,
+        getattr(job, "next_run_time", None),
+    )
     yield
     reminder_scheduler.shutdown(wait=False)
 

@@ -88,3 +88,19 @@ def test_reset_blocked_for_non_admin(prod_user_headers, prod_environment):
 def test_export_and_import_still_available(prod_admin_headers, prod_environment):
     r = client.get("/admin/database/export", headers=prod_admin_headers)
     assert r.status_code == 200
+
+
+def test_reset_allowed_in_staging_with_explicit_flag(prod_admin_headers):
+    original_env, original_allow = settings.environment, settings.allow_database_reset
+    settings.environment = "staging"
+    settings.allow_database_reset = True
+    try:
+        r = client.post("/admin/database/reset", json={"confirm": True}, headers=prod_admin_headers)
+        assert r.status_code == 200
+    finally:
+        settings.environment = original_env
+        settings.allow_database_reset = original_allow
+    # Produção permanece bloqueada mesmo com a flag ligada.
+    settings.allow_database_reset = True
+    r = client.post("/admin/database/reset", json={"confirm": True}, headers=prod_admin_headers)
+    assert r.status_code == 403

@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy.orm import Session
@@ -95,6 +97,11 @@ def send_test(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_dependency),
 ):
-    """Envia uma notificação de teste para todos os dispositivos inscritos."""
-    sent = push_service.send_push_to_all(db, title=data.title, body=data.body, url=data.url)
-    return {"sent": sent}
+    """Envia notificação de teste somente para os dispositivos do usuário logado."""
+    run_id = uuid4().hex
+    sent = push_service.send_push_to_all(
+        db, title=data.title, body=data.body, url=data.url,
+        user_id=current_user.id, run_id=run_id,
+    )
+    # "sent" = aceito pelo provedor; exibição no aparelho exige confirmação visual.
+    return {"sent": sent, "run_id": run_id}

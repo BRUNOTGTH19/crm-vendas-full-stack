@@ -49,22 +49,36 @@ def remove_subscription(db: Session, endpoint: str, user_id: int) -> bool:
     return True
 
 
-def send_push_to_all(db: Session, title: str, body: str, url: str = "/#/queue") -> int:
-    """Envia uma notificação para todos os dispositivos inscritos.
+def send_push_to_all(
+    db: Session, title: str, body: str, url: str = "/#/queue", *,
+    user_id: int | None = None, run_id: str = "direct",
+) -> int:
+    """Envia aos inscritos, opcionalmente apenas aos dispositivos de user_id.
 
-    Retorna quantos envios foram aceitos. Subscrições inválidas/expiradas
-    (404/410) são removidas do banco.
+    Retorna envios ACEITOS pelo provedor, não confirma exibição no celular.
+    Subscrições expiradas (404/410) são removidas; outras falhas são preservadas.
     """
     # Resolve as chaves VAPID (env → banco → geração automática persistida).
     try:
         _, vapid_private_key = get_vapid_keys(db)
     except Exception as exc:  # nunca derruba o job por falha de configuração
-        logger.warning("Web Push desativado: não foi possível obter as chaves VAPID: %s", exc)
+        logger.warning("push_config_failed run_id=%s error_type=%s", run_id, type(exc).__name__)
         return 0
 
-    payload = json.dumps({"title": title, "body": body, "url": url})
+    payload = json.dumps({
+        "title": title, "body": body, "url": url,
+        "icon": "/icons/icon-192.png", "tag": "crm-alerta",
+        "data": {"run_id": run_id},
+    })
+    query = db.query(PushSubscription)
+    if user_id is not None:
+        query = query.filter(PushSubscription.user_id == user_id)
+    subscriptions = query.all()
+    logger.info("push_targets run_id=%s user_id=%s subscriptions=%d", run_id, user_id, len(subscriptions))
     sent = 0
-    for sub in db.query(PushSubscription).all():
+    for sub in subscriptions:
+        sub_id, owner_id = sub.id, sub.user_id
+        logger.info("push_attempt run_id=%s user_id=%s subscription_id=%s", run_id, owner_id, sub_id)
         try:
             webpush(
                 subscription_info={
@@ -74,15 +88,30 @@ def send_push_to_all(db: Session, title: str, body: str, url: str = "/#/queue") 
                 data=payload,
                 vapid_private_key=vapid_private_key,
                 vapid_claims={"sub": settings.vapid_subject},
+                timeout=10,
+                ttl=3600,
             )
             sent += 1
+            logger.info("push_accepted run_id=%s user_id=%s subscription_id=%s", run_id, owner_id, sub_id)
         except WebPushException as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
+            logger.warning(
+                "push_failed run_id=%s user_id=%s subscription_id=%s status=%s error_type=%s",
+                run_id, owner_id, sub_id, status, type(exc).__name__,
+            )
             if status in (404, 410):
-                # Subscrição expirada/revogada: remove para não poluir o banco.
-                db.delete(sub)
-                db.commit()
-            logger.warning("Falha ao enviar push (endpoint %s…): %s", sub.endpoint[:40], exc)
-        except Exception as exc:  # cache best-effort: nunca derruba o job
-            logger.warning("Erro inesperado no push: %s", exc)
+                try:
+                    db.delete(sub)
+                    db.commit()
+                    logger.info("push_subscription_removed run_id=%s subscription_id=%s", run_id, sub_id)
+                except Exception as cleanup_exc:
+                    db.rollback()
+                    logger.warning("push_cleanup_failed run_id=%s subscription_id=%s error_type=%s",
+                                   run_id, sub_id, type(cleanup_exc).__name__)
+        except Exception as exc:
+            # Não registrar endpoint, chaves ou texto da exceção (podem conter segredos).
+            logger.warning("push_failed run_id=%s user_id=%s subscription_id=%s error_type=%s",
+                           run_id, owner_id, sub_id, type(exc).__name__)
+    logger.info("push_finished run_id=%s user_id=%s accepted=%d failed=%d",
+                run_id, user_id, sent, len(subscriptions) - sent)
     return sent

@@ -35,11 +35,16 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       tag: "crm-alerta",
       renotify: true,
-      data: { url: data.url || "/#/queue" },
+      data: { url: data.url || "/#/queue", run_id: data.data?.run_id },
+    }).then(() => {
+      console.info("push_displayed", { run_id: data.data?.run_id });
+    }).catch((error) => {
+      console.error("push_display_failed", { run_id: data.data?.run_id, error_type: error.name });
+      throw error;
     })
   );
 });
@@ -53,9 +58,8 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ("focus" in client) {
-          client.focus();
-          if ("navigate" in client) client.navigate(target);
-          return;
+          return ("navigate" in client ? client.navigate(target) : Promise.resolve(client))
+            .then((navigated) => (navigated || client).focus());
         }
       }
       return self.clients.openWindow(target);

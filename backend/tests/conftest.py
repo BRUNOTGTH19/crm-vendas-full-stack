@@ -8,6 +8,9 @@ os.environ["REDIS_URL"] = "redis://127.0.0.1:1/15"
 os.environ["JWT_SECRET_KEY"] = "isolated-test-key-not-for-production"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["ALLOW_DATABASE_RESET"] = "true"
+os.environ["REMINDER_DAYS_BEFORE"] = "0"
+os.environ["REMINDER_HOUR"] = "8"
+os.environ["REMINDER_TIMEZONE"] = "UTC"
 
 import pytest
 from sqlalchemy import create_engine, event

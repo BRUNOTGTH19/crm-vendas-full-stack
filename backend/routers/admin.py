@@ -6,9 +6,11 @@ Todas as rotas exigem o papel ``admin`` (dependência ``require_admin``):
 - GET  /admin/database/export  — baixa um JSON consolidado dos dados
 - POST /admin/database/import  — reinsere dados a partir do JSON exportado
 """
+import json
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,10 +18,49 @@ from config import settings
 from database import get_db
 from middleware.auth_middleware import require_admin
 from models.user import User
+from scheduler import ReminderJobBusy, run_due_charges
 from schemas.admin import ExportPayload, ImportResult, ResetRequest, ResetResult
 from services import admin_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class ReminderRunRequest(BaseModel):
+    user_id: int | None = Field(default=None, gt=0)
+    dry_run: bool = Field(default=True, strict=True)
+    confirm: bool = Field(default=False, strict=True)
+
+
+@router.post("/reminders/run")
+def run_reminders(
+    data: ReminderRunRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Prévia por padrão. Envio real exige confirmação; pode atingir todos os responsáveis."""
+    if not data.dry_run and not data.confirm:
+        raise HTTPException(status_code=400, detail="Envio real exige confirm=true.")
+    if data.user_id is not None and db.get(User, data.user_id) is None:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    # Persistir intenção ANTES do efeito externo (push não pode sofrer rollback).
+    from uuid import uuid4
+
+    run_id = uuid4().hex
+    admin_service.log_action(db, current_user.id, "reminder_run_requested", json.dumps({
+        "run_id": run_id, **data.model_dump(),
+    }))
+    db.commit()
+    try:
+        result = run_due_charges(user_id=data.user_id, dry_run=data.dry_run,
+                                 source="manual", run_id=run_id)
+    except ReminderJobBusy as exc:
+        raise HTTPException(status_code=409, detail="Verificação já em andamento.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Falha na verificação. Consulte os logs: {run_id}") from exc
+    admin_service.log_action(db, current_user.id, "reminder_run_completed", json.dumps(result))
+    db.commit()
+    return result
+
 
 # Tabelas de dados apagadas no reset (usuários são preservados).
 DATA_TABLES = ["sale_items", "payments", "push_subscriptions", "sales", "clients"]
@@ -32,8 +73,9 @@ def reset_database(
     current_user: User = Depends(require_admin),
 ):
     """Zera os dados do ambiente. Exige ``confirm: true`` no corpo."""
-    if settings.environment != "test" or not settings.allow_database_reset:
-        raise HTTPException(status_code=403, detail="Reset permitido somente no ambiente de teste explicitamente habilitado.")
+    reset_environments = {"test", "staging"}
+    if settings.environment not in reset_environments or not settings.allow_database_reset:
+        raise HTTPException(status_code=403, detail="Reset permitido somente em ambiente de teste/staging com liberação explícita.")
     if not data.confirm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
