@@ -82,6 +82,7 @@ com três operações protegidas pela dependência `require_admin` (403 para nã
 - `POST /admin/database/reset` — zera as tabelas de dados. Exige `{"confirm": true}`.
   **Preserva a tabela `users`** (não desloga o admin). Apaga, respeitando as FKs:
   `sale_items`, `payments`, `push_subscriptions`, `sales`, `clients`.
+  Controlado pela flag `ALLOW_DATABASE_RESET` (padrão `true`); se `false`, responde 403.
 - `GET /admin/database/export` — baixa um JSON consolidado (`crm_vendas_export.json`)
   com todos os registros das tabelas de dados.
 - `POST /admin/database/import?mode=skip|overwrite` — reinsere dados do arquivo
@@ -141,6 +142,11 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
    - `REDIS_URL` (do Upstash)
    - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
    - `ENVIRONMENT=production`
+   - **(opcional)** `ALLOW_DATABASE_RESET=true` — habilita o botão "Zerar dados"
+     no painel admin. O padrão já é `true`; use `false` para bloquear totalmente.
+   - **(opcional)** `CORS_ALLOW_ORIGINS=*` — origens permitidas (separadas por
+     vírgula). `*` libera todas; para restringir, informe o domínio do frontend
+     (ex.: `https://seu-app.vercel.app`).
    - **Web Push (opcional):** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e
      `VAPID_SUBJECT` (ex.: `mailto:admin@crm-vendas.com`). Gere o par com
      `python gen_vapid_keys.py`. **Se não definir, o backend gera e persiste

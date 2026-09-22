@@ -20,6 +20,13 @@ candidates = (
             User.email.like("faseA_%@test.com"),
             User.email.like("diag%@test.com"),
             User.email == "teste1@crm.com",
+            # Sondagens de diagnóstico em produção (E2E manual contra o backend
+            # publicado). Cobrir esses padrões permite remover resíduos de teste
+            # sem tocar em dados reais.
+            User.email.like("e2e_probe_%@example.com"),
+            User.email.like("e2e_%@example.com"),
+            User.email.like("probe_%@example.com"),
+            User.email.like("diag_%@example.com"),
         )
     )
     .all()
