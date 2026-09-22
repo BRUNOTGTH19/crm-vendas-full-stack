@@ -9,6 +9,9 @@ Regras de negócio:
 - A lista de lembretes reaproveita o mesmo universo de vendas que o
   APScheduler marca em Redis (``pending:reminders``) e ainda inclui vendas
   já vencidas, para a central de cobranças funcionar mesmo sem o job diário.
+- TODAS as consultas são restritas ao dono do escopo (``owner_id``): um
+  usuário comum vê apenas as próprias cobranças; o admin pode ver as de um
+  usuário específico via ``X-View-User``.
 """
 from datetime import date, timedelta
 from decimal import Decimal
@@ -112,8 +115,22 @@ def build_collection_message(db: Session, sale: Sale) -> dict:
     }
 
 
-def list_due_reminders(db: Session) -> list[dict]:
-    """Lista cobranças que vencem hoje ou já venceram.
+def _reminder_dict(db: Session, sale: Sale, today: date, scheduled: bool) -> dict:
+    client = db.query(Client).filter(Client.id == sale.client_id).first()
+    return {
+        "sale_id": sale.id,
+        "client_id": sale.client_id,
+        "client_name": client.full_name if client else f"Cliente {sale.client_id}",
+        "whatsapp": client.whatsapp if client else None,
+        "situation": situation_of(sale.due_date, today),
+        "amount": sale.remaining if sale.remaining is not None else sale.total,
+        "due_date": sale.due_date,
+        "scheduled": scheduled,
+    }
+
+
+def list_due_reminders(db: Session, owner_id: int | None = None) -> list[dict]:
+    """Lista cobranças que vencem hoje ou já venceram (escopo do dono).
 
     Une as vendas pendentes com ``due_date <= hoje`` ao conjunto marcado pelo
     agendador em ``pending:reminders`` (assim, mesmo uma cobrança futura marcada
@@ -122,59 +139,33 @@ def list_due_reminders(db: Session) -> list[dict]:
     today = date.today()
     horizon = today + timedelta(days=0)
 
-    sales = (
-        db.query(Sale)
-        .filter(
-            Sale.status == SaleStatus.pending,
-            Sale.due_date.isnot(None),
-            Sale.due_date <= horizon,
-        )
-        .order_by(Sale.due_date.asc(), Sale.id.asc())
-        .all()
+    sales_query = db.query(Sale).filter(
+        Sale.status == SaleStatus.pending,
+        Sale.due_date.isnot(None),
+        Sale.due_date <= horizon,
     )
+    if owner_id is not None:
+        sales_query = sales_query.filter(Sale.user_id == owner_id)
+    sales = sales_query.order_by(Sale.due_date.asc(), Sale.id.asc()).all()
 
     scheduled_ids = cache.get_pending_reminders()
     reminders: list[dict] = []
     seen: set[int] = set()
 
     for sale in sales:
-        client = db.query(Client).filter(Client.id == sale.client_id).first()
-        reminders.append(
-            {
-                "sale_id": sale.id,
-                "client_id": sale.client_id,
-                "client_name": client.full_name if client else f"Cliente {sale.client_id}",
-                "whatsapp": client.whatsapp if client else None,
-                "situation": situation_of(sale.due_date, today),
-                "amount": sale.remaining if sale.remaining is not None else sale.total,
-                "due_date": sale.due_date,
-                "scheduled": sale.id in scheduled_ids,
-            }
-        )
+        reminders.append(_reminder_dict(db, sale, today, sale.id in scheduled_ids))
         seen.add(sale.id)
 
     # Vendas marcadas pelo agendador que não caíram no filtro acima (ex.: data
     # futura marcada manualmente) também entram na lista.
     extra_ids = scheduled_ids - seen
     if extra_ids:
-        extras = (
-            db.query(Sale)
-            .filter(Sale.id.in_(extra_ids), Sale.status == SaleStatus.pending)
-            .all()
+        extras_query = db.query(Sale).filter(
+            Sale.id.in_(extra_ids), Sale.status == SaleStatus.pending
         )
-        for sale in extras:
-            client = db.query(Client).filter(Client.id == sale.client_id).first()
-            reminders.append(
-                {
-                    "sale_id": sale.id,
-                    "client_id": sale.client_id,
-                    "client_name": client.full_name if client else f"Cliente {sale.client_id}",
-                    "whatsapp": client.whatsapp if client else None,
-                    "situation": situation_of(sale.due_date, today),
-                    "amount": sale.remaining if sale.remaining is not None else sale.total,
-                    "due_date": sale.due_date,
-                    "scheduled": True,
-                }
-            )
+        if owner_id is not None:
+            extras_query = extras_query.filter(Sale.user_id == owner_id)
+        for sale in extras_query.all():
+            reminders.append(_reminder_dict(db, sale, today, True))
 
     return reminders

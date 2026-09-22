@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.auth_middleware import get_current_user_dependency
+from middleware.auth_middleware import get_current_user_dependency, resolve_data_owner
 from models.sale import SaleStatus
 from models.user import User
 from schemas.sale import SaleCreate, SaleResponse
@@ -20,10 +20,13 @@ router = APIRouter(prefix="/sales", tags=["Sales"])
 def create_sale_endpoint(
     data: SaleCreate,
     db: Session = Depends(get_db),
+    owner_id: int | None = Depends(resolve_data_owner),
     current_user: User = Depends(get_current_user_dependency),
 ):
+    # Escopo global (admin sem seleção) registra a venda em nome do próprio admin.
+    scope = current_user.id if owner_id is None else owner_id
     try:
-        return create_sale(db, data, current_user.id)
+        return create_sale(db, data, scope)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -36,24 +39,28 @@ def get_sales(
     client_id: Optional[int] = Query(None, description="Filtra por cliente"),
     status_filter: Optional[SaleStatus] = Query(None, alias="status", description="paid ou pending"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    return list_sales(db, client_id=client_id, status_filter=status_filter)
+    return list_sales(db, client_id=client_id, status_filter=status_filter, owner_id=owner_id)
 
 
 @router.get("/client/{client_id}", response_model=list[SaleResponse])
 def get_client_sales(
     client_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Histórico de vendas do cliente (cache Redis de 2 min, doc 4.2)."""
-    cache_key = f"sales:client:{client_id}"
+    """Histórico de vendas do cliente (cache Redis de 2 min, doc 4.2).
+
+    O cache é escopado por dono para não vazar o histórico entre usuários.
+    """
+    scope = "global" if owner_id is None else owner_id
+    cache_key = f"sales:client:{client_id}:owner:{scope}"
     cached = cache.get_json(cache_key)
     if cached is not None:
         return JSONResponse(content=cached)
 
-    sales = list_sales(db, client_id=client_id)
+    sales = list_sales(db, client_id=client_id, owner_id=owner_id)
     data = jsonable_encoder(
         [SaleResponse.model_validate(s) for s in sales]
     )
@@ -65,9 +72,9 @@ def get_client_sales(
 def get_sale_endpoint(
     sale_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    sale = get_sale(db, sale_id)
+    sale = get_sale(db, sale_id, owner_id=owner_id)
     if not sale:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Venda não encontrada"
@@ -79,10 +86,10 @@ def get_sale_endpoint(
 def pay_sale(
     sale_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
     try:
-        return mark_sale_paid(db, sale_id)
+        return mark_sale_paid(db, sale_id, owner_id=owner_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

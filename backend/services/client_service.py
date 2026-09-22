@@ -18,9 +18,14 @@ def normalize_name(name: str) -> str:
 
 def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
     name_normalized = normalize_name(data.full_name)
+    # Unicidade por DONO: cada usuário pode ter o próprio cadastro do mesmo
+    # nome; nomes iguais só conflitam dentro da mesma base de dados.
     existing = (
         db.query(Client)
-        .filter(Client.name_normalized == name_normalized)
+        .filter(
+            Client.name_normalized == name_normalized,
+            Client.created_by_id == user_id,
+        )
         .first()
     )
     if existing:
@@ -38,23 +43,34 @@ def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
     return client
 
 
-def list_clients(db: Session, search: str | None = None) -> list[Client]:
+def list_clients(
+    db: Session, search: str | None = None, owner_id: int | None = None
+) -> list[Client]:
     query = db.query(Client)
+    if owner_id is not None:
+        query = query.filter(Client.created_by_id == owner_id)
     if search:
         term = normalize_name(search)
         query = query.filter(Client.name_normalized.like(f"%{term}%"))
     return query.order_by(Client.full_name).all()
 
 
-def get_client(db: Session, client_id: int) -> Client | None:
-    return db.query(Client).filter(Client.id == client_id).first()
+def get_client(db: Session, client_id: int, owner_id: int | None = None) -> Client | None:
+    query = db.query(Client).filter(Client.id == client_id)
+    if owner_id is not None:
+        query = query.filter(Client.created_by_id == owner_id)
+    return query.first()
 
 
 def update_client(db: Session, client: Client, data: ClientUpdate) -> Client:
     name_normalized = normalize_name(data.full_name)
     existing = (
         db.query(Client)
-        .filter(Client.name_normalized == name_normalized, Client.id != client.id)
+        .filter(
+            Client.name_normalized == name_normalized,
+            Client.created_by_id == client.created_by_id,
+            Client.id != client.id,
+        )
         .first()
     )
     if existing:

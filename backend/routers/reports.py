@@ -6,12 +6,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.auth_middleware import get_current_user_dependency
+from middleware.auth_middleware import resolve_data_owner
 from models.client import Client
 from models.sale import Sale, SaleStatus
-from models.user import User
 from models.sale_item import SaleItem
 from services.pdf_service import build_report_pdf
+from services.scope import scoped
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -29,11 +29,11 @@ def paid_report_pdf(
     start: date = Query(..., description="Data inicial (YYYY-MM-DD)"),
     end: date = Query(..., description="Data final (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Relatório PDF de vendas pagas no período (doc 2.5)."""
+    """Relatório PDF de vendas pagas no período (doc 2.5), no escopo resolvido."""
     sales = (
-        db.query(Sale)
+        scoped(db.query(Sale), Sale.user_id, owner_id)
         .filter(
             Sale.status == SaleStatus.paid,
             Sale.sale_date >= start,
@@ -65,11 +65,11 @@ def paid_report_pdf(
 @router.get("/pending")
 def pending_report_pdf(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Relatório PDF de vendas pendentes (doc 2.5)."""
+    """Relatório PDF de vendas pendentes (doc 2.5), no escopo resolvido."""
     sales = (
-        db.query(Sale)
+        scoped(db.query(Sale), Sale.user_id, owner_id)
         .filter(Sale.status == SaleStatus.pending)
         .order_by(Sale.due_date, Sale.id)
         .all()
@@ -98,13 +98,16 @@ def pending_report_pdf(
 @router.get("/charges")
 def charges_report_pdf(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Relatório PDF de cobranças com dados do cliente e da compra (doc 2.5)."""
+    """Relatório PDF de cobranças (doc 2.5), no escopo resolvido."""
     today = date.today()
     sales = (
-        db.query(Sale)
-        .filter(Sale.status == SaleStatus.pending, Sale.due_date.isnot(None))
+        scoped(db.query(Sale), Sale.user_id, owner_id)
+        .filter(
+            Sale.status == SaleStatus.pending,
+            Sale.due_date.isnot(None),
+        )
         .order_by(Sale.due_date, Sale.id)
         .all()
     )
@@ -144,9 +147,9 @@ def cashflow_report_pdf(
         description="Mês de referência no formato YYYY-MM (padrão: mês atual)",
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Fechamento de caixa do mês em PDF (doc 2.5)."""
+    """Fechamento de caixa do mês em PDF (doc 2.5), no escopo resolvido."""
     today = date.today()
     if month:
         try:
@@ -164,8 +167,11 @@ def cashflow_report_pdf(
     last_day = next_month - timedelta(days=1)
 
     sales = (
-        db.query(Sale)
-        .filter(Sale.sale_date >= first_day, Sale.sale_date <= last_day)
+        scoped(db.query(Sale), Sale.user_id, owner_id)
+        .filter(
+            Sale.sale_date >= first_day,
+            Sale.sale_date <= last_day,
+        )
         .order_by(Sale.sale_date, Sale.id)
         .all()
     )
@@ -200,12 +206,15 @@ def sales_report(
     start: date = Query(..., description="Data inicial (YYYY-MM-DD)"),
     end: date = Query(..., description="Data final (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Resumo de vendas no período."""
+    """Resumo de vendas no período, no escopo resolvido."""
     sales = (
-        db.query(Sale)
-        .filter(Sale.sale_date >= start, Sale.sale_date <= end)
+        scoped(db.query(Sale), Sale.user_id, owner_id)
+        .filter(
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
+        )
         .order_by(Sale.sale_date, Sale.id)
         .all()
     )
@@ -235,17 +244,20 @@ def sales_report(
 @router.get("/clients")
 def clients_report(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Total de vendas e faturamento por cliente."""
+    """Total de vendas e faturamento por cliente, no escopo resolvido."""
     rows = (
-        db.query(
-            Client.id,
-            Client.full_name,
-            func.count(Sale.id).label("sales_count"),
-            func.coalesce(func.sum(Sale.total), 0).label("total_revenue"),
+        scoped(
+            db.query(
+                Client.id,
+                Client.full_name,
+                func.count(Sale.id).label("sales_count"),
+                func.coalesce(func.sum(Sale.total), 0).label("total_revenue"),
+            ).outerjoin(Sale, Sale.client_id == Client.id),
+            Client.created_by_id,
+            owner_id,
         )
-        .outerjoin(Sale, Sale.client_id == Client.id)
         .group_by(Client.id, Client.full_name)
         .order_by(func.sum(Sale.total).desc())
         .all()
@@ -264,14 +276,18 @@ def clients_report(
 @router.get("/products")
 def products_report(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Produtos mais vendidos."""
+    """Produtos mais vendidos, no escopo resolvido."""
     rows = (
-        db.query(
-            SaleItem.product_name,
-            func.sum(SaleItem.quantity).label("total_quantity"),
-            func.sum(SaleItem.subtotal).label("total_revenue"),
+        scoped(
+            db.query(
+                SaleItem.product_name,
+                func.sum(SaleItem.quantity).label("total_quantity"),
+                func.sum(SaleItem.subtotal).label("total_revenue"),
+            ).join(Sale, Sale.id == SaleItem.sale_id),
+            Sale.user_id,
+            owner_id,
         )
         .group_by(SaleItem.product_name)
         .order_by(func.sum(SaleItem.quantity).desc())
@@ -285,4 +301,3 @@ def products_report(
         }
         for r in rows
     ]
-

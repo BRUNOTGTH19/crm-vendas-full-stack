@@ -12,14 +12,23 @@ def _quant(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"))
 
 
-def register_payment(db: Session, sale_id: int, data: PaymentCreate) -> Payment:
+def _get_owned_sale(db: Session, sale_id: int, owner_id: int | None) -> Sale | None:
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if owner_id is not None:
+        query = query.filter(Sale.user_id == owner_id)
+    return query.first()
+
+
+def register_payment(
+    db: Session, sale_id: int, data: PaymentCreate, owner_id: int | None = None
+) -> Payment:
     """Registra um pagamento (parcial ou total) em uma venda pendente.
 
     Validações feitas sempre no backend:
-    - venda deve existir e não pode estar totalmente paga;
+    - venda deve existir **no escopo do dono** e não pode estar totalmente paga;
     - valor pago deve ser positivo e não exceder o saldo devedor.
     """
-    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    sale = _get_owned_sale(db, sale_id, owner_id)
     if not sale:
         raise ValueError("Venda não encontrada")
 
@@ -66,7 +75,12 @@ def register_payment(db: Session, sale_id: int, data: PaymentCreate) -> Payment:
     return payment
 
 
-def get_payments_by_sale(db: Session, sale_id: int) -> list[Payment]:
+def get_payments_by_sale(
+    db: Session, sale_id: int, owner_id: int | None = None
+) -> list[Payment]:
+    # Sem posse da venda (venda inexistente/fora do escopo), não expõe nada.
+    if _get_owned_sale(db, sale_id, owner_id) is None:
+        return []
     return (
         db.query(Payment)
         .filter(Payment.sale_id == sale_id)

@@ -3,11 +3,20 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.auth_middleware import get_current_user_dependency
-from models.user import User
+from middleware.auth_middleware import resolve_data_owner
 from services import queue_service
+from services.sale_service import get_sale
 
 router = APIRouter(prefix="/queue", tags=["Queue"])
+
+
+def _assert_owns_job(db: Session, job: dict, owner_id: int | None) -> None:
+    """Garante que o job de PDF pertence a uma venda do dono do escopo."""
+    sale = get_sale(db, job["sale_id"], owner_id=owner_id)
+    if sale is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado ou expirado"
+        )
 
 
 @router.post("/pdf/{sale_id}", status_code=status.HTTP_202_ACCEPTED)
@@ -15,9 +24,13 @@ def enqueue_sale_pdf(
     sale_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Enfileira a geração do PDF de recibo de uma venda."""
+    """Enfileira a geração do PDF de recibo de uma venda do escopo."""
+    if get_sale(db, sale_id, owner_id=owner_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Venda não encontrada"
+        )
     try:
         job_id = queue_service.enqueue_pdf_job(sale_id)
     except ValueError as exc:
@@ -33,13 +46,14 @@ def enqueue_sale_pdf(
 def get_pdf_job_status(
     job_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
     result = queue_service.get_job_status(job_id)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado ou expirado"
         )
+    _assert_owns_job(db, result, owner_id)
     return result
 
 
@@ -47,13 +61,14 @@ def get_pdf_job_status(
 def download_pdf(
     job_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
     job = queue_service.get_job_status(job_id)
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado ou expirado"
         )
+    _assert_owns_job(db, job, owner_id)
     if job["status"] == "error":
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -75,4 +90,3 @@ def download_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="recibo_venda_{job["sale_id"]}.pdf"'},
     )
-

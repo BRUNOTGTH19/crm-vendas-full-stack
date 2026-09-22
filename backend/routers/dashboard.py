@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -6,77 +6,121 @@ from sqlalchemy.orm import Session
 
 import cache
 from database import get_db
-from middleware.auth_middleware import get_current_user_dependency
+from middleware.auth_middleware import resolve_data_owner
 from models.client import Client
 from models.sale import Sale, SaleStatus
-from models.user import User
 from models.sale_item import SaleItem
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
+def _scoped(query, column, owner_id: int | None):
+    """Restringe a consulta ao dono do escopo; ``owner_id=None`` mantém o
+    escopo global (visão consolidada do administrador)."""
+    if owner_id is not None:
+        query = query.filter(column == owner_id)
+    return query
+
+
 @router.get("")
 def get_dashboard(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dependency),
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Métricas gerais para a tela inicial do CRM (cache Redis de 5 min, doc 4.2)."""
-    month_key = f"dashboard:{date.today():%Y-%m}"
+    """Métricas do painel no escopo resolvido (dono, usuário selecionado ou global).
+
+    A chave de cache inclui o escopo (``owner:<id>`` ou ``owner:global``) para
+    que as métricas de um usuário NUNCA sejam reutilizadas por outro
+    (doc 4.2, cache Redis 5 min).
+    """
+    scope = "global" if owner_id is None else owner_id
+    month_key = f"dashboard:{date.today():%Y-%m}:owner:{scope}"
     cached = cache.get_json(month_key)
     if cached is not None:
         return cached
 
-    data = _compute_dashboard(db)
+    data = _compute_dashboard(db, owner_id)
 
     cache.set_json(month_key, data, cache.DASHBOARD_TTL)
     return data
 
 
-def _compute_dashboard(db: Session) -> dict:
+def _compute_dashboard(db: Session, owner_id: int | None) -> dict:
     today = date.today()
     first_day_month = today.replace(day=1)
 
-    total_clients = db.query(func.count(Client.id)).scalar() or 0
-    total_sales = db.query(func.count(Sale.id)).scalar() or 0
+    total_clients = (
+        _scoped(db.query(func.count(Client.id)), Client.created_by_id, owner_id)
+        .scalar()
+        or 0
+    )
+    total_sales = (
+        _scoped(db.query(func.count(Sale.id)), Sale.user_id, owner_id).scalar() or 0
+    )
 
     revenue_paid = (
-        db.query(func.coalesce(func.sum(Sale.total), 0))
-        .filter(Sale.status == SaleStatus.paid)
-        .scalar()
+        _scoped(
+            db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+                Sale.status == SaleStatus.paid
+            ),
+            Sale.user_id,
+            owner_id,
+        ).scalar()
     )
     revenue_pending = (
-        db.query(func.coalesce(func.sum(Sale.remaining), 0))
-        .filter(Sale.status == SaleStatus.pending)
-        .scalar()
+        _scoped(
+            db.query(func.coalesce(func.sum(Sale.remaining), 0)).filter(
+                Sale.status == SaleStatus.pending
+            ),
+            Sale.user_id,
+            owner_id,
+        ).scalar()
     )
     pending_count = (
-        db.query(func.count(Sale.id)).filter(Sale.status == SaleStatus.pending).scalar() or 0
+        _scoped(
+            db.query(func.count(Sale.id)).filter(Sale.status == SaleStatus.pending),
+            Sale.user_id,
+            owner_id,
+        ).scalar()
+        or 0
     )
     overdue_count = (
-        db.query(func.count(Sale.id))
-        .filter(
-            Sale.status == SaleStatus.pending,
-            Sale.due_date < today,
-        )
-        .scalar() or 0
+        _scoped(
+            db.query(func.count(Sale.id)).filter(
+                Sale.status == SaleStatus.pending,
+                Sale.due_date < today,
+            ),
+            Sale.user_id,
+            owner_id,
+        ).scalar()
+        or 0
     )
     revenue_month = (
-        db.query(func.coalesce(func.sum(Sale.total), 0))
-        .filter(
-            Sale.status == SaleStatus.paid,
-            Sale.sale_date >= first_day_month,
-        )
-        .scalar()
+        _scoped(
+            db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+                Sale.status == SaleStatus.paid,
+                Sale.sale_date >= first_day_month,
+            ),
+            Sale.user_id,
+            owner_id,
+        ).scalar()
     )
 
     recent_sales = (
-        db.query(Sale).order_by(Sale.created_at.desc(), Sale.id.desc()).limit(5).all()
+        _scoped(db.query(Sale), Sale.user_id, owner_id)
+        .order_by(Sale.created_at.desc(), Sale.id.desc())
+        .limit(5)
+        .all()
     )
     top_products = (
-        db.query(
-            SaleItem.product_name,
-            func.sum(SaleItem.quantity).label("total_quantity"),
-            func.sum(SaleItem.subtotal).label("total_revenue"),
+        _scoped(
+            db.query(
+                SaleItem.product_name,
+                func.sum(SaleItem.quantity).label("total_quantity"),
+                func.sum(SaleItem.subtotal).label("total_revenue"),
+            ).join(Sale, Sale.id == SaleItem.sale_id),
+            Sale.user_id,
+            owner_id,
         )
         .group_by(SaleItem.product_name)
         .order_by(func.sum(SaleItem.quantity).desc())
@@ -112,4 +156,3 @@ def _compute_dashboard(db: Session) -> dict:
             for p in top_products
         ],
     }
-

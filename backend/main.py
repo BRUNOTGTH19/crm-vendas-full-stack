@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from config import settings
+from middleware.rate_limit import is_login_blocked, record_login_failure
 from routers import (
     admin,
     auth,
@@ -51,6 +52,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def login_rate_limit(request: Request, call_next):
+    """Anti força-bruta no login: 15 falhas (401) por IP em 5 minutos -> 429.
+
+    Apenas tentativas FALHAS são contadas — usuários legítimos que logam
+    com sucesso nunca são bloqueados.
+    """
+    if request.method == "POST" and request.url.path == "/auth/login":
+        ip = request.client.host if request.client else "unknown"
+        key = f"login:{ip}"
+        if is_login_blocked(key):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Muitas tentativas de login. Tente novamente em alguns minutos."
+                },
+            )
+        response = await call_next(request)
+        if response.status_code == 401:
+            record_login_failure(key)
+        return response
+    return await call_next(request)
 
 
 @app.middleware("http")

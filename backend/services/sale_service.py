@@ -13,7 +13,13 @@ from schemas.sale import SaleCreate
 
 
 def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
-    client = db.query(Client).filter(Client.id == data.client_id).first()
+    # O cliente precisa pertencer ao dono do escopo: impede que um usuário
+    # registre vendas em clientes de outro usuário.
+    client = (
+        db.query(Client)
+        .filter(Client.id == data.client_id, Client.created_by_id == user_id)
+        .first()
+    )
     if not client:
         raise ValueError("Cliente não encontrado")
 
@@ -83,16 +89,22 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
     return sale
 
 
-def get_sale(db: Session, sale_id: int) -> Sale | None:
-    return db.query(Sale).filter(Sale.id == sale_id).first()
+def get_sale(db: Session, sale_id: int, owner_id: int | None = None) -> Sale | None:
+    query = db.query(Sale).filter(Sale.id == sale_id)
+    if owner_id is not None:
+        query = query.filter(Sale.user_id == owner_id)
+    return query.first()
 
 
 def list_sales(
     db: Session,
     client_id: int | None = None,
     status_filter: SaleStatus | None = None,
+    owner_id: int | None = None,
 ) -> list[Sale]:
     query = db.query(Sale)
+    if owner_id is not None:
+        query = query.filter(Sale.user_id == owner_id)
     if client_id:
         query = query.filter(Sale.client_id == client_id)
     if status_filter:
@@ -100,8 +112,8 @@ def list_sales(
     return query.order_by(Sale.sale_date.desc(), Sale.id.desc()).all()
 
 
-def mark_sale_paid(db: Session, sale_id: int) -> Sale:
-    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+def mark_sale_paid(db: Session, sale_id: int, owner_id: int | None = None) -> Sale:
+    sale = get_sale(db, sale_id, owner_id)
     if not sale:
         raise ValueError("Venda não encontrada")
     sale.status = SaleStatus.paid
