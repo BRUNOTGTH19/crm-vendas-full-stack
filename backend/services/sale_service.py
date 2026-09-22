@@ -80,6 +80,7 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
                     f"vencimento para {sale.due_date.strftime('%d/%m/%Y')}!"
                 ),
                 url="/#/queue",
+                user_id=user_id,
             )
         except Exception:
             # Mantém a sessão limpa; a venda já foi persistida acima.
