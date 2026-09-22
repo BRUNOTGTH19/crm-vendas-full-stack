@@ -54,6 +54,24 @@ app.add_middleware(
 )
 
 
+def _login_client_key(request: Request) -> str:
+    """Identidade do cliente para o rate limit do login.
+
+    Prefere o primeiro IP de ``X-Forwarded-For`` (definido pelo proxy do
+    hosting, ex.: Render) porque atrás do load balancer o socket remoto é
+    interno — usar ``request.client.host`` ali agraria TODOS os usuários na
+    mesma chave e um atacante poderia bloquear o login de todo mundo.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip() or "unknown"
+    elif request.client:
+        ip = request.client.host
+    else:
+        ip = "unknown"
+    return f"login:{ip}"
+
+
 @app.middleware("http")
 async def login_rate_limit(request: Request, call_next):
     """Anti força-bruta no login: 15 falhas (401) por IP em 5 minutos -> 429.
@@ -62,8 +80,7 @@ async def login_rate_limit(request: Request, call_next):
     com sucesso nunca são bloqueados.
     """
     if request.method == "POST" and request.url.path == "/auth/login":
-        ip = request.client.host if request.client else "unknown"
-        key = f"login:{ip}"
+        key = _login_client_key(request)
         if is_login_blocked(key):
             return JSONResponse(
                 status_code=429,
