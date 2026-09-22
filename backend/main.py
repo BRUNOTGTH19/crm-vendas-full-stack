@@ -39,10 +39,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+# CORS: a autenticação usa token Bearer (header Authorization), NÃO cookies.
+# Por isso `allow_credentials=False` — combinar "*" com credenciais é uma
+# configuração rejeitada por navegadores e um risco de segurança. As origens
+# podem ser restringidas via CORS_ALLOW_ORIGINS (lista separada por vírgula).
+_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_origins or ["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

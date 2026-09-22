@@ -1,7 +1,10 @@
+import logging
 from decimal import Decimal
 
 import cache
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from models.client import Client
 from models.sale import Sale, SaleStatus
@@ -46,18 +49,37 @@ def create_sale(db: Session, data: SaleCreate, user_id: int) -> Sale:
     cache.invalidate_dashboard_cache()
     cache.invalidate_client_sales_cache(data.client_id)
 
-    # Envia push imediatamente se a venda vence hoje ou já está vencida
+    # Envia push imediatamente se a venda vence hoje ou já está vencida.
+    #
+    # A notificação é BEST-EFFORT: qualquer falha (rede, chaves VAPID,
+    # provedor fora do ar) NUNCA deve impedir o registro da venda. Antes,
+    # um erro aqui fazia a rota devolver HTTP 500; como a exceção escapava
+    # do middleware de CORS, o navegador reportava "backend não está na
+    # porta 8000" em vez do erro real.
     from datetime import date
-    if sale.status == SaleStatus.pending and sale.due_date and sale.due_date <= date.today():
-        from services.push_service import send_push_to_all
-        # Import local to avoid circular deps if any
-        send_push_to_all(
-            db,
-            title="🔔 Nova cobrança pendente",
-            body=f"Venda para {client.name} (R$ {sale.total}) está com vencimento para {sale.due_date.strftime('%d/%m/%Y')}!",
-            url="/#/queue"
-        )
-        
+
+    if (
+        sale.status == SaleStatus.pending
+        and sale.due_date
+        and sale.due_date <= date.today()
+    ):
+        try:
+            from services.push_service import send_push_to_all
+
+            send_push_to_all(
+                db,
+                title="🔔 Nova cobrança pendente",
+                body=(
+                    f"Venda para {client.full_name} (R$ {sale.total}) está com "
+                    f"vencimento para {sale.due_date.strftime('%d/%m/%Y')}!"
+                ),
+                url="/#/queue",
+            )
+        except Exception:
+            # Mantém a sessão limpa; a venda já foi persistida acima.
+            db.rollback()
+            logger.warning("sale_push_failed sale_id=%s", sale.id, exc_info=True)
+
     return sale
 
 

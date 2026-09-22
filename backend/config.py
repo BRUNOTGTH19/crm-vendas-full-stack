@@ -14,7 +14,16 @@ class Settings(BaseSettings):
 
     app_name: str = "CRM Vendas API"
     environment: str = "development"
-    allow_database_reset: bool = False
+
+    # Habilita o reset de dados (POST /admin/database/reset).
+    # Opt-out: ligado por padrão para não travar o administrador. Defina
+    # ALLOW_DATABASE_RESET=false no .env para desabilitar a ação.
+    allow_database_reset: bool = True
+
+    # Origens permitidas no CORS, separadas por vírgula. "*" libera todas
+    # (adequado para um app público sem cookies). Nunca combine "*" com
+    # credenciais: o token viaja no header Authorization, não em cookie.
+    cors_allow_origins: str = "*"
 
     database_url: str
     redis_url: str

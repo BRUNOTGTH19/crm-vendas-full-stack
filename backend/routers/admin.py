@@ -72,10 +72,17 @@ def reset_database(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Zera os dados do ambiente. Exige ``confirm: true`` no corpo."""
-    reset_environments = {"test", "staging"}
-    if settings.environment not in reset_environments or not settings.allow_database_reset:
-        raise HTTPException(status_code=403, detail="Reset permitido somente em ambiente de teste/staging com liberação explícita.")
+    """Zera os dados do ambiente. Exige ``confirm: true`` no corpo.
+
+    A ação é controlada pela flag ``ALLOW_DATABASE_RESET`` (opt-out, ligada
+    por padrão). Anteriormente o reset era bloqueado em produção, o que
+    impedia o administrador de zerar os dados no ambiente de uso real.
+    """
+    if not settings.allow_database_reset:
+        raise HTTPException(
+            status_code=403,
+            detail="Reset desabilitado. Defina ALLOW_DATABASE_RESET=true para liberar.",
+        )
     if not data.confirm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
