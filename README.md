@@ -97,12 +97,6 @@ confirmação, exportação, importação skip/overwrite e auditoria).
 
 # Deploy (100% gratuito, sem cartão)
 
-## ⚠️ Importante — conta obrigatória
-
-Todos os cadastros devem ser feitos com o e-mail **brunodesousa.ti@gmail.com**
-ou com a conta GitHub **BRUNOTGTH19** (que está vinculada a esse e-mail).
-**Não usar nenhuma outra conta.**
-
 Stack de hospedagem (todos gratuitos e sem cartão de crédito):
 
 | Serviço | Papel | Cadastro |
