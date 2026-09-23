@@ -1,17 +1,21 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal } from "../components/Modal.tsx";
 import {
   ApiError,
+  adminDeleteUser,
   adminExportDatabase,
   adminImportDatabase,
+  adminListUsers,
   adminResetDatabase,
   type AdminImportResult,
   type AdminResetResult,
+  type AdminUser,
 } from "../lib/api.ts";
 
 /**
- * Área restrita a administradores: zerar, exportar e importar dados.
- * Rota: #/admin/dados (só renderizada quando o usuário tem role "admin").
+ * Área restrita a administradores: zerar, exportar, importar dados e
+ * gerenciar usuários. Rota: #/admin/dados (só renderizada quando o
+ * usuário tem role "admin").
  */
 export function AdminData() {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -21,6 +25,9 @@ export function AdminData() {
   const [resetResult, setResetResult] = useState<AdminResetResult | null>(null);
   const [importResult, setImportResult] = useState<AdminImportResult | null>(null);
   const [importMode, setImportMode] = useState<"skip" | "overwrite">("skip");
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersBusy, setUsersBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function doReset() {
@@ -67,6 +74,40 @@ export function AdminData() {
       setImportResult(res);
       setOk("Importação concluída.");
       if (fileRef.current) fileRef.current.value = "";
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadUsers() {
+    setUsersBusy(true);
+    setError("");
+    try {
+      setUsers(await adminListUsers());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+    } finally {
+      setUsersBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function doDeleteUser() {
+    if (!deleteTarget) return;
+    setBusy(true);
+    setError("");
+    setOk("");
+    try {
+      await adminDeleteUser(deleteTarget.id);
+      setOk(`Usuário ${deleteTarget.email} excluído com seus dados.`);
+      setDeleteTarget(null);
+      await loadUsers();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : String(err));
     } finally {
@@ -162,6 +203,69 @@ export function AdminData() {
         </section>
       </div>
 
+      {/* Usuários */}
+      <section className="mt-4 rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Usuários</h2>
+            <p className="mt-1 text-xs text-zinc-400">
+              Excluir um usuário comum remove também os clientes, vendas,
+              pagamentos e inscrições de push dele. Administradores são
+              protegidos e não podem ser excluídos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadUsers()}
+            disabled={usersBusy}
+            className="rounded-full border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+          >
+            {usersBusy ? "Carregando…" : "Atualizar lista"}
+          </button>
+        </div>
+        <ul className="mt-4 space-y-2">
+          {users.map((u) => (
+            <li
+              key={u.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#1A1A1A] px-4 py-3"
+            >
+              <div>
+                <div className="text-sm font-semibold text-white">
+                  {u.name}
+                  <span
+                    className={
+                      u.role === "admin"
+                        ? "ml-2 rounded-full bg-[#FAC775]/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-[#FAC775]"
+                        : "ml-2 rounded-full bg-[#534AB7]/30 px-2 py-0.5 text-[10px] font-semibold uppercase text-[#B7B0F0]"
+                    }
+                  >
+                    {u.role}
+                  </span>
+                </div>
+                <div className="text-xs text-zinc-400">{u.email}</div>
+              </div>
+              {u.role === "user" ? (
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(u)}
+                  disabled={busy}
+                  className="rounded-full bg-red-500/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  Excluir
+                </button>
+              ) : (
+                <span className="text-xs text-zinc-500">protegido</span>
+              )}
+            </li>
+          ))}
+          {!usersBusy && users.length === 0 && (
+            <li className="rounded-2xl border border-white/10 bg-[#1A1A1A] px-4 py-3 text-xs text-zinc-400">
+              Nenhum usuário encontrado.
+            </li>
+          )}
+        </ul>
+      </section>
+
       {resetResult && (
         <div className="mt-6 rounded-2xl border border-white/10 bg-[#26215C] p-4 text-sm">
           <div className="mb-1 font-semibold text-white">Último reset</div>
@@ -218,6 +322,41 @@ export function AdminData() {
               className="rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
             >
               {busy ? "Zerando…" : "Confirmar e zerar"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          title="Confirmar exclusão de usuário"
+          onClose={() => {
+            if (!busy) setDeleteTarget(null);
+          }}
+        >
+          <p className="text-sm text-zinc-300">
+            Excluir{" "}
+            <span className="font-semibold text-white">{deleteTarget.name}</span> (
+            {deleteTarget.email})? Todos os dados dele serão apagados: clientes,
+            vendas, itens, pagamentos e inscrições de push.{" "}
+            <span className="font-semibold text-red-300">Esta ação não tem volta.</span>
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              disabled={busy}
+              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={doDeleteUser}
+              disabled={busy}
+              className="rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+            >
+              {busy ? "Excluindo…" : "Confirmar exclusão"}
             </button>
           </div>
         </Modal>

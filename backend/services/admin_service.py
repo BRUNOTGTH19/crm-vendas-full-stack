@@ -1,8 +1,10 @@
-"""Gestão de dados (admin): reset, exportação e importação.
+"""Gestão de dados (admin): reset, exportação, importação e gestão de usuários.
 
-Cobre apenas as tabelas de DADOS (clients, sales, sale_items, payments,
-push_subscriptions). A tabela ``users`` é PRESERVADA no reset para não
-deslogar o administrador que executa a operação.
+Cobre as tabelas de DADOS (clients, sales, sale_items, payments,
+push_subscriptions) e a tabela de USUÁRIOS (listagem e deleção).
+
+A tabela ``users`` é PRESERVADA no reset para não deslogar o administrador
+que executa a operação.
 
 O reset usa DELETE (não TRUNCATE) respeitando a ordem das foreign keys:
 sale_items e payments antes de sales; sales antes de clients.
@@ -19,6 +21,7 @@ from models.payment import Payment
 from models.push_subscription import PushSubscription
 from models.sale import Sale
 from models.sale_item import SaleItem
+from models.user import User
 from schemas.admin import (
     ClientExport,
     DataTables,
@@ -28,6 +31,8 @@ from schemas.admin import (
     PushSubscriptionExport,
     SaleExport,
     SaleItemExport,
+    UserListItem,
+    UserDeleteResult,
 )
 
 
@@ -171,3 +176,105 @@ def import_data(
     db.commit()
     invalidate_data_cache()
     return ImportResult(mode=mode, inserted=inserted, skipped=skipped, updated=updated)
+
+
+# ---------------------------------------------------------------------------
+# Usuários
+# ---------------------------------------------------------------------------
+
+
+def list_users(db: Session) -> list[UserListItem]:
+    """Lista todos os usuários do sistema (nome, e-mail, papel, data de criação).
+
+    Apenas administradores têm acesso. Não retorna password_hash.
+    """
+    users = db.query(User).order_by(User.id).all()
+    return [
+        UserListItem(
+            id=u.id,
+            name=u.name,
+            email=u.email,
+            role=u.role.value if hasattr(u.role, "value") else str(u.role),
+            created_at=u.created_at,
+        )
+        for u in users
+    ]
+
+
+def delete_user(db: Session, user_id: int, admin_id: int, confirm: bool) -> UserDeleteResult:
+    """Deleta um usuário comum e seus dados associados.
+
+    Regras de segurança:
+    - ``confirm`` deve ser ``True``, caso contrário a operação é recusada.
+    - O próprio admin não pode se deletar.
+    - Admins não podem deletar outros admins.
+    - Antes de deletar o usuário, remove-se suas dependências (clients, sales,
+      sale_items, payments, audit_logs, push_subscriptions) respeitando as FKs.
+    """
+    if not confirm:
+        raise ValueError("Confirmação obrigatória: envie confirm=true para excluir o usuário.")
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise ValueError("Usuário não encontrado")
+
+    if user.role.value == "admin":
+        raise ValueError("Não é possível excluir outro administrador")
+
+    if user.id == admin_id:
+        raise ValueError("Um administrador não pode excluir a si mesmo")
+
+    # Remove dependências do usuário (FKs: filhos antes dos pais).
+    # Ordem: sale_items -> payments -> push_subscriptions -> sales -> clients
+    # -> audit_logs -> users
+
+    # Vendas do usuário + vendas legadas presas a clientes dele (mesmo critério
+    # do cleanup_test_data.py: evita órfãos de dados antigos).
+    sale_ids = {s.id for s in db.query(Sale).filter(Sale.user_id == user_id)}
+    client_ids = [c.id for c in db.query(Client).filter(Client.created_by_id == user_id)]
+    if client_ids:
+        sale_ids.update(
+            s.id for s in db.query(Sale).filter(Sale.client_id.in_(client_ids))
+        )
+    sale_ids = list(sale_ids)
+
+    # Sale items e payments das vendas afetadas
+    if sale_ids:
+        db.query(SaleItem).filter(SaleItem.sale_id.in_(sale_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Payment).filter(Payment.sale_id.in_(sale_ids)).delete(
+            synchronize_session=False
+        )
+
+    # Push subscriptions
+    db.query(PushSubscription).filter(PushSubscription.user_id == user_id).delete(
+        synchronize_session=False
+    )
+
+    # Sales e clients criados pelo usuário
+    if sale_ids:
+        db.query(Sale).filter(Sale.id.in_(sale_ids)).delete(synchronize_session=False)
+    if client_ids:
+        db.query(Client).filter(Client.id.in_(client_ids)).delete(synchronize_session=False)
+
+    # Audit logs do usuário
+    db.query(AuditLog).filter(AuditLog.user_id == user_id).delete(synchronize_session=False)
+
+    # Por fim, o próprio usuário
+    db.delete(user)
+
+    log_action(
+        db,
+        admin_id,
+        "user_deleted",
+        json.dumps({"deleted_user_id": user_id, "deleted_user_email": user.email}, ensure_ascii=False),
+    )
+    db.commit()
+    invalidate_data_cache()
+
+    return UserDeleteResult(
+        deleted=True,
+        user_id=user_id,
+        preserved=["users"],
+    )

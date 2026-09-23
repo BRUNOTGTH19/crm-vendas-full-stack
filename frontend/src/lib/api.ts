@@ -117,7 +117,7 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string) => request<T>("PATCH", path),
-  del: (path: string) => request<void>("DELETE", path),
+  del: <T = void>(path: string, body?: unknown) => request<T>("DELETE", path, body),
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -293,4 +293,28 @@ export async function adminImportDatabase(
   }
   if (!res.ok) throw new ApiError(res.status, detailFrom(data, `Erro ${res.status}`));
   return data as AdminImportResult;
+}
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "user";
+  created_at: string;
+}
+
+export interface AdminUserDeleteResult {
+  deleted: boolean;
+  user_id: number;
+  preserved: string[];
+}
+
+/** Lista todos os usuários do sistema (somente admin). Nunca inclui hash de senha. */
+export function adminListUsers(): Promise<AdminUser[]> {
+  return api.get<AdminUser[]>("/admin/users");
+}
+
+/** Exclui um usuário comum e seus dados associados (exige confirmação explícita). */
+export function adminDeleteUser(userId: number): Promise<AdminUserDeleteResult> {
+  return api.del<AdminUserDeleteResult>(`/admin/users/${userId}`, { confirm: true });
 }

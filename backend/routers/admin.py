@@ -5,6 +5,8 @@ Todas as rotas exigem o papel ``admin`` (dependência ``require_admin``):
 - POST /admin/database/reset   — zera as tabelas de dados (users preservado)
 - GET  /admin/database/export  — baixa um JSON consolidado dos dados
 - POST /admin/database/import  — reinsere dados a partir do JSON exportado
+- GET  /admin/users            — lista todos os usuários
+- DELETE /admin/users/{user_id} — exclui um usuário comum
 """
 import json
 
@@ -19,7 +21,15 @@ from database import get_db
 from middleware.auth_middleware import require_admin
 from models.user import User
 from scheduler import ReminderJobBusy, run_due_charges
-from schemas.admin import ExportPayload, ImportResult, ResetRequest, ResetResult
+from schemas.admin import (
+    DeleteUserRequest,
+    ExportPayload,
+    ImportResult,
+    ResetRequest,
+    ResetResult,
+    UserDeleteResult,
+    UserListItem,
+)
 from services import admin_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -144,3 +154,48 @@ def import_database(
     except (IntegrityError, ValueError) as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Conflito de dados ou referência inválida. Nenhum registro foi importado.") from exc
+
+
+# ---------------------------------------------------------------------------
+# Gestão de usuários
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users", response_model=list[UserListItem])
+def list_users_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Lista todos os usuários do sistema (somente administradores)."""
+    return admin_service.list_users(db)
+
+
+@router.delete(
+    "/users/{user_id}",
+    response_model=UserDeleteResult,
+    responses={status.HTTP_400_BAD_REQUEST: {"model": None}, status.HTTP_404_NOT_FOUND: {"model": None}},
+)
+def delete_user_endpoint(
+    user_id: int,
+    data: DeleteUserRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Exclui um usuário comum e seus dados associados.
+
+    Exige ``confirm: true`` no corpo para evitar deleção acidental.
+    O próprio admin não pode se excluir, e admins não podem excluir outros
+    admins.
+    """
+    try:
+        return admin_service.delete_user(db, user_id, current_user.id, data.confirm)
+    except ValueError as exc:
+        if "não encontrado" in str(exc).lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc

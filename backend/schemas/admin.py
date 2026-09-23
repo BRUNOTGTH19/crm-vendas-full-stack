@@ -105,3 +105,29 @@ class ResetRequest(BaseModel):
 class ResetResult(BaseModel):
     cleared: dict[str, int]
     preserved: list[str]
+
+
+class UserListItem(BaseModel):
+    """Item da lista de usuários retornados por GET /admin/users."""
+
+    id: int
+    name: str
+    email: str
+    role: str
+    created_at: datetime
+
+
+class DeleteUserRequest(BaseModel):
+    """Corpo do DELETE /admin/users/{user_id}.
+
+    ``confirm`` precisa ser exatamente ``True`` para evitar deleção acidental.
+    O próprio admin não pode se deletar e o admin não pode deletar outro admin.
+    """
+
+    confirm: StrictBool = False
+
+
+class UserDeleteResult(BaseModel):
+    deleted: bool
+    user_id: int
+    preserved: list[str]  # always ["users"] — users table is never truncated here
