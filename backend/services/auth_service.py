@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import logging
+
 import redis
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -81,6 +83,21 @@ def register_user(db: Session, data: UserCreate) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def reset_password(db: Session, email: str, new_password: str) -> None:
+    """Redefinição simples de senha pelo e-mail cadastrado (sem link/código).
+
+    Decisão de produto: disponível na tela de login para quem esqueceu a senha.
+    O endpoint que chama esta função é protegido por rate limit por IP.
+    """
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise ValueError("E-mail não cadastrado")
+
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    logging.getLogger(__name__).info("password_reset email=%s user_id=%s", email, user.id)
 
 
 def login_user(db: Session, email: str, password: str) -> dict:

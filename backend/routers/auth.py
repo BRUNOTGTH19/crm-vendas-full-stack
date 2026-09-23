@@ -6,6 +6,7 @@ from database import get_db
 from schemas.user import (
     UserCreate,
     UserLogin,
+    PasswordResetRequest,
     TokenResponse,
     UserResponse,
     RefreshRequest,
@@ -14,6 +15,7 @@ from schemas.user import (
 from services.auth_service import (
     register_user,
     login_user,
+    reset_password,
     get_current_user,
     refresh_tokens,
     revoke_session,
@@ -39,6 +41,21 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password_endpoint(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Redefinição simples de senha direto na tela de login (sem link ou código).
+
+    Basta o e-mail cadastrado + a nova senha. Protegido por rate limit por IP
+    (10 chamadas / 10 minutos). Tokens já emitidos continuam válidos até
+    expirarem; a senha nova passa a valer no próximo login.
+    """
+    try:
+        reset_password(db, data.email, data.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -122,6 +122,17 @@ export const api = {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/**
+ * Redefinição simples de senha (tela de login): sem link, código ou e-mail.
+ * Basta o e-mail cadastrado + a nova senha.
+ */
+export function resetPassword(email: string, newPassword: string): Promise<void> {
+  return api.post<void>("/auth/reset-password", {
+    email,
+    new_password: newPassword,
+  });
+}
+
 /** Baixa qualquer endpoint de relatório PDF (doc 2.5) e dispara o download. */
 export async function downloadReportPdf(path: string, filename: string): Promise<void> {
   const headers: Record<string, string> = {};

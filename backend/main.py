@@ -6,7 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, Response
 
 from config import settings
-from middleware.rate_limit import is_login_blocked, record_login_failure
+from middleware.rate_limit import (
+    is_login_blocked,
+    is_password_reset_blocked,
+    record_login_failure,
+    record_password_reset,
+)
 from routers import (
     admin,
     auth,
@@ -54,8 +59,8 @@ app.add_middleware(
 )
 
 
-def _login_client_key(request: Request) -> str:
-    """Identidade do cliente para o rate limit do login.
+def _client_ip(request: Request) -> str:
+    """IP do cliente para os rate limits (login e redefinição de senha).
 
     Prefere o primeiro IP de ``X-Forwarded-For`` (definido pelo proxy do
     hosting, ex.: Render) porque atrás do load balancer o socket remoto é
@@ -64,12 +69,18 @@ def _login_client_key(request: Request) -> str:
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        ip = forwarded.split(",")[0].strip() or "unknown"
-    elif request.client:
-        ip = request.client.host
-    else:
-        ip = "unknown"
-    return f"login:{ip}"
+        return forwarded.split(",")[0].strip() or "unknown"
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def _login_client_key(request: Request) -> str:
+    return f"login:{_client_ip(request)}"
+
+
+def _reset_client_key(request: Request) -> str:
+    return f"reset:{_client_ip(request)}"
 
 
 @app.middleware("http")
@@ -77,7 +88,9 @@ async def login_rate_limit(request: Request, call_next):
     """Anti força-bruta no login: 15 falhas (401) por IP em 5 minutos -> 429.
 
     Apenas tentativas FALHAS são contadas — usuários legítimos que logam
-    com sucesso nunca são bloqueados.
+    com sucesso nunca são bloqueados. A redefinição de senha tem seu próprio
+    contador (10 chamadas por IP em 10 minutos), porque cada chamada troca
+    uma senha.
     """
     if request.method == "POST" and request.url.path == "/auth/login":
         key = _login_client_key(request)
@@ -92,6 +105,20 @@ async def login_rate_limit(request: Request, call_next):
         if response.status_code == 401:
             record_login_failure(key)
         return response
+
+    if request.method == "POST" and request.url.path == "/auth/reset-password":
+        key = _reset_client_key(request)
+        if is_password_reset_blocked(key):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Muitas redefinições de senha. Tente novamente em alguns minutos."
+                },
+            )
+        response = await call_next(request)
+        record_password_reset(key)
+        return response
+
     return await call_next(request)
 
 
