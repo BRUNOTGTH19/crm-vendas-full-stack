@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import type { User } from "../types.ts";
 import { getPushState, enablePush, disablePush } from "../lib/push.ts";
+import { initialsOf, roleLabel } from "../lib/user-label.ts";
 const NAV = [
   { href: "#/", label: "Painel", icon: "\u{1F4CA}" },
   { href: "#/clients", label: "Clientes", icon: "\u{1F465}" },
@@ -162,14 +163,34 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
         </button>
       </nav>
 
-      {/* Top bar mobile for Push Toggle */}
-      <div className="lg:hidden flex flex-wrap items-center justify-between gap-2 bg-[#26215C] px-4 py-3 border-b border-white/10">
-        <div className="text-lg font-bold text-white">CRM Vendas</div>
-        {user.role === "admin" && (
-          <a href={ADMIN_NAV.href} className="text-sm text-[#FAC775]">Dados (admin)</a>
-        )}
-        <PushToggle />
-      </div>
+      {/* Identificação do usuário logado: fixa no topo, presente em todas as rotas */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#26215C]/95 backdrop-blur lg:ml-64">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 md:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="text-lg font-bold text-white lg:hidden">CRM Vendas</span>
+            <span
+              aria-hidden
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#534AB7] text-xs font-bold text-[#FAC775]"
+            >
+              {initialsOf(user.name)}
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-white">{user.name}</div>
+              <div className="text-[10px] uppercase tracking-wide text-zinc-400">
+                {roleLabel(user.role)}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {user.role === "admin" && (
+              <a href={ADMIN_NAV.href} className="text-sm text-[#FAC775] lg:hidden">
+                Dados (admin)
+              </a>
+            )}
+            <PushToggle />
+          </div>
+        </div>
+      </header>
 
       <main className="px-4 pb-24 pt-6 md:px-8 lg:ml-64 lg:pb-8 lg:pt-8">{children}</main>
     </div>
