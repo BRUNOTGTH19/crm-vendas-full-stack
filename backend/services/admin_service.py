@@ -218,11 +218,11 @@ def delete_user(db: Session, user_id: int, admin_id: int, confirm: bool) -> User
     if user is None:
         raise ValueError("Usuário não encontrado")
 
-    if user.role.value == "admin":
-        raise ValueError("Não é possível excluir outro administrador")
-
     if user.id == admin_id:
         raise ValueError("Um administrador não pode excluir a si mesmo")
+
+    if user.role.value == "admin":
+        raise ValueError("Não é possível excluir outro administrador")
 
     # Remove dependências do usuário (FKs: filhos antes dos pais).
     # Ordem: sale_items -> payments -> push_subscriptions -> sales -> clients
