@@ -23,3 +23,8 @@ export function firstDayOfMonthISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
+
+/** Mês corrente no formato `AAAA-MM` (usado nos relatórios de caixa). */
+export function currentMonthISO(): string {
+  return todayISO().slice(0, 7);
+}

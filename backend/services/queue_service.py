@@ -3,22 +3,18 @@ import base64
 import uuid
 from datetime import datetime, timezone
 
-import os
-import redis
-
 from database import SessionLocal
 from models.client import Client
 from models.sale import Sale
+from redis_client import build_redis_client
 from services.pdf_service import generate_invoice_pdf
 
-_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-_ssl = _redis_url.startswith("rediss://")
-
-redis_client = redis.Redis.from_url(
-    _redis_url,
-    decode_responses=False,
-    ssl_cert_reqs=None if _ssl else "required",
-)
+# Os jobs guardam bytes no Redis (``hgetall`` devolve ``{b"campo": ...}``), por
+# isso ``decode_responses=False``. O cliente vem da fábrica compartilhada:
+# antes ele era criado aqui passando ``ssl_cert_reqs`` mesmo em URL ``redis://``
+# (sem TLS), e a redis-py estourava TypeError — POST /queue/pdf/{id} devolvia
+# 500 e nenhum recibo em PDF podia ser emitido fora de produção.
+redis_client = build_redis_client(decode_responses=False)
 
 JOB_TTL_SECONDS = 3600  # jobs e PDFs expiram em 1 hora
 

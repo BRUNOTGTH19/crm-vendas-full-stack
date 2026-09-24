@@ -1,6 +1,8 @@
 """Geração de PDF de recibo sem dependências externas."""
-from io import BytesIO
+from datetime import date
 from decimal import Decimal
+from io import BytesIO
+from xml.sax.saxutils import escape as escape_xml
 
 from models.client import Client
 from models.sale import Sale
@@ -89,11 +91,79 @@ def generate_invoice_pdf(sale: Sale, client: Client) -> bytes:
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config import settings
+
 PRIMARY_COLOR = colors.HexColor("#26215C")  # roxo — doc 3.4
+LIGHT_ROW_COLOR = colors.HexColor("#F2F1F8")
+GRID_COLOR = colors.HexColor("#999999")
+MUTED_COLOR = colors.HexColor("#555555")
+
+REPORT_FONT_SIZE = 8
+REPORT_LEADING = 10
+MIN_COLUMN_WIDTH = 16 * mm
+NO_ROWS_TEXT = "Nenhum registro no período."
+
+_CELL_STYLE = ParagraphStyle(
+    "ReportCell",
+    fontName="Helvetica",
+    fontSize=REPORT_FONT_SIZE,
+    leading=REPORT_LEADING,
+)
+_HEADER_STYLE = ParagraphStyle(
+    "ReportHeader",
+    fontName="Helvetica-Bold",
+    fontSize=REPORT_FONT_SIZE,
+    leading=REPORT_LEADING,
+    textColor=colors.white,
+)
+
+
+def _column_widths(
+    headers: list[str], rows: list[list[str]], available: float
+) -> list[float]:
+    """Largura de cada coluna proporcional ao conteúdo, somando ``available``.
+
+    Sem esse cálculo a tabela assumia a largura natural do conteúdo e
+    ultrapassava a área útil do A4 (ex.: 538pt para 451pt disponíveis nos
+    relatórios de 5 colunas), cortando as últimas colunas na margem direita.
+    """
+    weights: list[float] = []
+    for index, header in enumerate(headers):
+        widest = stringWidth(str(header), "Helvetica-Bold", REPORT_FONT_SIZE)
+        for row in rows:
+            cell = row[index] if index < len(row) else ""
+            widest = max(widest, stringWidth(str(cell), "Helvetica", REPORT_FONT_SIZE))
+        weights.append(max(widest + 8, MIN_COLUMN_WIDTH))
+
+    total = sum(weights) or 1.0
+    return [weight / total * available for weight in weights]
+
+
+def _footer_canvas(company: str, emitted_at: str):
+    """Rodapé com empresa/data da emissão e número da página.
+
+    Relatórios com muitas linhas geram várias páginas; sem o número fica
+    impossível remontar o documento impresso.
+    """
+
+    def draw(canvas, doc) -> None:
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(MUTED_COLOR)
+        canvas.drawString(
+            doc.leftMargin, 10 * mm, f"{company} · emitido em {emitted_at}"
+        )
+        canvas.drawRightString(
+            doc.pagesize[0] - doc.rightMargin, 10 * mm, f"Página {doc.page}"
+        )
+        canvas.restoreState()
+
+    return draw
 
 
 def build_report_pdf(
@@ -109,8 +179,11 @@ def build_report_pdf(
         buffer,
         pagesize=A4,
         title=title,
+        author=settings.company_name,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
         topMargin=15 * mm,
-        bottomMargin=15 * mm,
+        bottomMargin=20 * mm,
     )
     styles = getSampleStyleSheet()
 
@@ -121,30 +194,49 @@ def build_report_pdf(
         Spacer(1, 6 * mm),
     ]
 
-    table_data = [headers] + (rows if rows else [["—"] + [""] * (len(headers) - 1)])
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY_COLOR),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#999999")),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F1F8")]),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
-        )
+    if rows:
+        # Células como Paragraph: nomes longos quebram em várias linhas em vez
+        # de empurrar a tabela para fora da página.
+        body: list[list] = [
+            [Paragraph(escape_xml(str(cell)), _CELL_STYLE) for cell in row]
+            for row in rows
+        ]
+        empty_table = False
+    else:
+        body = [
+            [Paragraph(NO_ROWS_TEXT, _CELL_STYLE)] + [""] * (len(headers) - 1)
+        ]
+        empty_table = True
+
+    table_data = [
+        [Paragraph(escape_xml(str(headers_col)), _HEADER_STYLE) for headers_col in headers]
+    ] + body
+    table = Table(
+        table_data,
+        colWidths=_column_widths(headers, rows, doc.width),
+        repeatRows=1,
     )
+    table_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY_COLOR),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTSIZE", (0, 0), (-1, -1), REPORT_FONT_SIZE),
+        ("GRID", (0, 0), (-1, -1), 0.4, GRID_COLOR),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT_ROW_COLOR]),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    if empty_table:
+        table_style.append(("SPAN", (0, 1), (-1, 1)))
+    table.setStyle(TableStyle(table_style))
     story.append(table)
 
     if footers:
         story.append(Spacer(1, 6 * mm))
         for line in footers:
-            story.append(Paragraph(f"<b>{line}</b>", styles["Normal"]))
+            story.append(Paragraph(f"<b>{escape_xml(line)}</b>", styles["Normal"]))
 
-    doc.build(story)
+    footer = _footer_canvas(settings.company_name, date.today().strftime("%d/%m/%Y"))
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
 

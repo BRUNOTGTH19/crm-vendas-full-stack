@@ -5,8 +5,25 @@ import type { CollectionMessage, CollectionReminder, TokenResponse, User } from 
  * `http://127.0.0.1:8000` (ver vite.config.ts). Para producción, definir
  * VITE_API_URL con la URL completa del backend.
  */
-const API_BASE: string =
-  (import.meta.env?.VITE_API_URL as string | undefined) ?? "/api";
+const configuredApiUrl = (import.meta.env?.VITE_API_URL as string | undefined)?.trim();
+const API_BASE: string = configuredApiUrl
+  ? configuredApiUrl.replace(/\/+$/, "")
+  : "/api";
+
+function apiUrl(path: string): string {
+  return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function connectionError(): ApiError {
+  return new ApiError(
+    0,
+    "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente."
+  );
+}
+
+function reportPdfError(detail: string): ApiError {
+  return new ApiError(500, detail);
+}
 
 const TOKEN_KEY = "crm_token";
 const USER_KEY = "crm_user";
@@ -74,16 +91,13 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
 
   let res: Response;
   try {
-    res = await fetch(API_BASE + path, {
+    res = await fetch(apiUrl(path), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(
-      0,
-      "No se pudo conectar con el servidor. Verificá que el backend esté corriendo en el puerto 8000."
-    );
+    throw connectionError();
   }
 
   if (res.status === 204) return undefined as T;
@@ -133,13 +147,26 @@ export function resetPassword(email: string, newPassword: string): Promise<void>
   });
 }
 
-/** Baixa qualquer endpoint de relatório PDF (doc 2.5) e dispara o download. */
+/**
+ * Baixa qualquer endpoint de relatório PDF (doc 2.5) e dispara o download.
+ *
+ * Valida que a resposta é realmente um PDF: se um proxy/backend devolver
+ * HTML ou JSON com status 200, o navegador salvaria um arquivo inválido —
+ * era assim que o usuário "não conseguia emitir o relatório".
+ */
 export async function downloadReportPdf(path: string, filename: string): Promise<void> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+  };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(API_BASE + path, { headers });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), { headers });
+  } catch {
+    throw connectionError();
+  }
   if (!res.ok) {
     let detail = `Erro ${res.status}`;
     try {
@@ -150,15 +177,29 @@ export async function downloadReportPdf(path: string, filename: string): Promise
     }
     throw new ApiError(res.status, detail);
   }
-  const blob = await res.blob();
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/pdf")) {
+    throw reportPdfError("O servidor não devolveu um PDF. Tente novamente em instantes.");
+  }
+
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length < 5 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") {
+    throw reportPdfError("O arquivo recebido não é um PDF válido. Tente novamente.");
+  }
+
+  const blob = new Blob([bytes], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // Alguns navegadores móveis ainda estão processando o download quando o
+  // click retorna; revogar imediatamente pode salvar um PDF corrompido.
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /**
@@ -170,21 +211,21 @@ export async function downloadSaleReceipt(saleId: number): Promise<void> {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  let res = await fetch(API_BASE + `/queue/pdf/${saleId}`, { method: "POST", headers });
+  let res = await fetch(apiUrl(`/queue/pdf/${saleId}`), { method: "POST", headers });
   let body = await res.json();
   if (!res.ok) throw new ApiError(res.status, detailFrom(body, "No se pudo encolar el PDF"));
   const jobId = body.job_id as string;
 
   for (let i = 0; i < 24; i++) {
     await sleep(500);
-    res = await fetch(API_BASE + `/queue/pdf/${jobId}`, { headers });
+    res = await fetch(apiUrl(`/queue/pdf/${jobId}`), { headers });
     body = await res.json();
     if (!res.ok) throw new ApiError(res.status, detailFrom(body, "Error consultando el job"));
     if (body.status === "error") throw new ApiError(500, body.error ?? "Error generando el PDF");
     if (body.status === "done") break;
   }
 
-  res = await fetch(API_BASE + `/queue/pdf/${jobId}/download`, { headers });
+  res = await fetch(apiUrl(`/queue/pdf/${jobId}/download`), { headers });
   if (!res.ok) throw new ApiError(res.status, "No se pudo descargar el PDF");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -256,7 +297,7 @@ export async function adminExportDatabase(): Promise<void> {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(API_BASE + "/admin/database/export", { headers });
+  const res = await fetch(apiUrl("/admin/database/export"), { headers });
   if (!res.ok) {
     let detail = `Erro ${res.status}`;
     try {
@@ -290,7 +331,7 @@ export async function adminImportDatabase(
   form.append("file", file);
 
   const res = await fetch(
-    API_BASE + `/admin/database/import?mode=${encodeURIComponent(mode)}`,
+    apiUrl(`/admin/database/import?mode=${encodeURIComponent(mode)}`),
     { method: "POST", headers, body: form }
   );
   const text = await res.text();

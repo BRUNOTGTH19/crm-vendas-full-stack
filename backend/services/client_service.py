@@ -1,9 +1,12 @@
 import unicodedata
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.client import Client
 from schemas.client import ClientCreate, ClientUpdate
+
+NAME_CONFLICT_MESSAGE = "Já existe um cliente com esse nome"
 
 
 def normalize_name(name: str) -> str:
@@ -14,6 +17,21 @@ def normalize_name(name: str) -> str:
         if unicodedata.category(char) != "Mn"
     )
     return " ".join(name.split())
+
+
+def _commit(db: Session) -> None:
+    """Grava o cliente traduzindo conflito de nome em erro de negócio.
+
+    A checagem acima é por DONO, mas o índice ``clients.name_normalized`` é
+    GLOBAL (migration inicial). Renomear/criar um cliente com nome já usado
+    por outro usuário passava pela checagem, estourava ``IntegrityError`` no
+    commit e a API devolvia 500 — agora vira 400 com mensagem clara.
+    """
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ValueError(NAME_CONFLICT_MESSAGE) from exc
 
 
 def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
@@ -29,7 +47,7 @@ def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
         .first()
     )
     if existing:
-        raise ValueError("Já existe um cliente com esse nome")
+        raise ValueError(NAME_CONFLICT_MESSAGE)
 
     client = Client(
         full_name=data.full_name.strip(),
@@ -38,7 +56,7 @@ def create_client(db: Session, data: ClientCreate, user_id: int) -> Client:
         created_by_id=user_id,
     )
     db.add(client)
-    db.commit()
+    _commit(db)
     db.refresh(client)
     return client
 
@@ -74,12 +92,12 @@ def update_client(db: Session, client: Client, data: ClientUpdate) -> Client:
         .first()
     )
     if existing:
-        raise ValueError("Já existe um cliente com esse nome")
+        raise ValueError(NAME_CONFLICT_MESSAGE)
 
     client.full_name = data.full_name.strip()
     client.name_normalized = name_normalized
     client.whatsapp = (data.whatsapp or "").strip() or None
-    db.commit()
+    _commit(db)
     db.refresh(client)
     return client
 

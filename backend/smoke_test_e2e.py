@@ -23,14 +23,21 @@ def call(method, path, body=None, token=None, raw=False):
 
 import random
 email = f"e2e_{random.randint(1000,9999)}@test.com"
+# Nomes únicos por execução: o índice de `clients.name_normalized` é GLOBAL,
+# então nomes fixos colidiam com os resíduos de execuções anteriores e o
+# script morria antes de testar a fila de PDF (era o caso de "Cliente E2E").
+sufixo = email.split("_")[1].split("@")[0]
+nome_cliente = f"Cliente E2E {sufixo}"
+nome_atualizado = f"Cliente E2E Atualizado {sufixo}"
 
 print("register:", call("POST", "/auth/register", {"name": "E2E", "email": email, "password": "senha12345"}))
 code, data = call("POST", "/auth/login", {"email": email, "password": "senha12345"})
 TOKEN = data["access_token"]
 print("login ok")
 
-code, client = call("POST", "/clients", {"full_name": "Cliente E2E"}, TOKEN)
-print("client:", code, client["id"])
+code, client = call("POST", "/clients", {"full_name": nome_cliente}, TOKEN)
+print("client:", code, client if code != 201 else client["id"])
+assert code == 201, f"criacao de cliente falhou: {code} {client}"
 cid = client["id"]
 
 code, sale = call("POST", "/sales", {
@@ -44,21 +51,29 @@ sid = sale["id"]
 
 print("get sale:", call("GET", f"/sales/{sid}", None, TOKEN)[0])
 print("get client:", call("GET", f"/clients/{cid}", None, TOKEN)[0])
-print("update client:", call("PUT", f"/clients/{cid}", {"full_name": "Cliente E2E Atualizado"}, TOKEN)[0])
+print("update client:", call("PUT", f"/clients/{cid}", {"full_name": nome_atualizado}, TOKEN)[0])
 print("dashboard:", call("GET", "/dashboard", None, TOKEN)[1])
 print("report sales:", call("GET", "/reports/sales?start=2026-01-01&end=2026-12-31", None, TOKEN)[0])
 print("report clients:", call("GET", "/reports/clients", None, TOKEN)[0])
 print("report products:", call("GET", "/reports/products", None, TOKEN)[0])
+code, pdf = call("GET", "/reports/paid?start=2026-01-01&end=2026-12-31", None, TOKEN, raw=True)
+print("report pdf:", code, "bytes:", len(pdf), "header:", pdf[:8])
+assert code == 200 and pdf[:5] == b"%PDF-", "relatorio de vendas pagas nao retornou PDF"
 
 code, job = call("POST", f"/queue/pdf/{sid}", None, TOKEN)
 print("enqueue pdf:", code, job)
+# A fila responde 202 Accepted (job enfileirado), não 200.
+assert code in (200, 202), f"fila de PDF falhou: {code} {job}"
 time.sleep(2)
 code, status = call("GET", f"/queue/pdf/{job['job_id']}", None, TOKEN)
 print("job status:", code, status["status"])
 code, pdf = call("GET", f"/queue/pdf/{job['job_id']}/download", None, TOKEN, raw=True)
 print("pdf download:", code, "bytes:", len(pdf), "header:", pdf[:8])
+assert pdf[:5] == b"%PDF-", "recibo da fila nao retornou PDF"
 
 print("pay sale:", call("PATCH", f"/sales/{sid}/pay", None, TOKEN)[0])
 print("delete client (deve falhar, tem venda):", call("DELETE", f"/clients/{cid}", None, TOKEN)[0])
 
-from cleanup_test_data import *
+from cleanup_test_data import cleanup
+
+print("cleanup:", cleanup())

@@ -102,7 +102,9 @@ code, d2 = call("GET", "/dashboard", None, token)
 check("dashboard cacheado", d1 == d2)
 
 # limpar dados de teste
-from cleanup_test_data import *  # noqa: E402,F403
+from cleanup_test_data import cleanup  # noqa: E402
+
+cleanup()
 
 fails = results.count(False)
 print("=" * 40)

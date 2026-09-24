@@ -15,13 +15,72 @@ from services.scope import scoped
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
+# Limites do ano aceito em `?month=YYYY-MM` — evita datas absurdas (ex.: 0000-01).
+MIN_REPORT_YEAR = 1900
+MAX_REPORT_YEAR = 2999
+
 
 def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
+    """Entrega o PDF como download.
+
+    ``attachment`` (e não ``inline``) porque o usuário está *emitindo* um
+    relatório — o navegador deve salvar/abrir o arquivo, nunca renderizá-lo
+    como página. ``no-store`` impede que proxy, service worker ou cache do
+    navegador sirvam um PDF antigo depois de mudanças nos dados.
+    """
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
+
+
+def _validate_period(start: date, end: date) -> None:
+    """Período invertido devolveria relatório vazio sem explicação — 400 é mais claro."""
+    if start > end:
+        raise HTTPException(
+            status_code=400,
+            detail="Período inválido: a data inicial não pode ser maior que a data final.",
+        )
+
+
+def _client_name(sale: Sale) -> str:
+    """Nome do cliente do relatório (defensivo: nunca quebra a emissão)."""
+    return sale.client.full_name if sale.client else f"Cliente {sale.client_id}"
+
+
+def parse_month(month: str) -> tuple[int, int]:
+    """Valida ``YYYY-MM`` e devolve ``(ano, mês)``.
+
+    Levanta 400 em formato inválido **e** em mês/ano fora de faixa: antes,
+    ``?month=2026-13`` passava pela conversão de inteiros e estourava
+    ``date(2026, 13, 1)`` com 500 Internal Server Error.
+    """
+    try:
+        year_str, month_str = month.split("-")
+        year, mon = int(year_str), int(month_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Formato de mês inválido. Use YYYY-MM (ex.: 2026-09).",
+        ) from None
+
+    if not 1 <= mon <= 12:
+        raise HTTPException(
+            status_code=400,
+            detail="Mês inválido: use um valor entre 01 e 12.",
+        )
+    if not MIN_REPORT_YEAR <= year <= MAX_REPORT_YEAR:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ano inválido: use um valor entre {MIN_REPORT_YEAR} e {MAX_REPORT_YEAR}.",
+        )
+    return year, mon
 
 
 @router.get("/paid")
@@ -32,6 +91,7 @@ def paid_report_pdf(
     owner_id: int | None = Depends(resolve_data_owner),
 ):
     """Relatório PDF de vendas pagas no período (doc 2.5), no escopo resolvido."""
+    _validate_period(start, end)
     sales = (
         scoped(db.query(Sale), Sale.user_id, owner_id)
         .filter(
@@ -45,7 +105,7 @@ def paid_report_pdf(
     rows = [
         [
             f"#{s.id}",
-            s.client.full_name,
+            _client_name(s),
             s.sale_date.strftime("%d/%m/%Y"),
             f"R$ {float(s.total):.2f}",
         ]
@@ -77,7 +137,7 @@ def pending_report_pdf(
     rows = [
         [
             f"#{s.id}",
-            s.client.full_name,
+            _client_name(s),
             s.sale_date.strftime("%d/%m/%Y"),
             s.due_date.strftime("%d/%m/%Y") if s.due_date else "—",
             f"R$ {float(s.total):.2f}",
@@ -123,7 +183,7 @@ def charges_report_pdf(
         rows.append(
             [
                 f"#{s.id}",
-                s.client.full_name,
+                _client_name(s),
                 s.due_date.strftime("%d/%m/%Y"),
                 situacao,
                 f"R$ {float(s.total):.2f}",
@@ -152,13 +212,7 @@ def cashflow_report_pdf(
     """Fechamento de caixa do mês em PDF (doc 2.5), no escopo resolvido."""
     today = date.today()
     if month:
-        try:
-            year, mon = (int(part) for part in month.split("-"))
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Formato de mês inválido. Use YYYY-MM.",
-            )
+        year, mon = parse_month(month)
     else:
         year, mon = today.year, today.month
 
@@ -180,7 +234,7 @@ def cashflow_report_pdf(
     rows = [
         [
             f"#{s.id}",
-            s.client.full_name,
+            _client_name(s),
             s.sale_date.strftime("%d/%m/%Y"),
             "Paga" if s.status == SaleStatus.paid else "Pendente",
             f"R$ {float(s.total):.2f}",
@@ -209,6 +263,7 @@ def sales_report(
     owner_id: int | None = Depends(resolve_data_owner),
 ):
     """Resumo de vendas no período, no escopo resolvido."""
+    _validate_period(start, end)
     sales = (
         scoped(db.query(Sale), Sale.user_id, owner_id)
         .filter(
@@ -231,7 +286,7 @@ def sales_report(
             {
                 "id": s.id,
                 "client_id": s.client_id,
-                "client_name": s.client.full_name,
+                "client_name": _client_name(s),
                 "sale_date": s.sale_date.isoformat(),
                 "status": s.status.value,
                 "total": float(s.total),
