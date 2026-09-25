@@ -5,6 +5,7 @@ import {
   chargesReportDownload,
   paidReportDownload,
   pendingReportDownload,
+  periodReportDownload,
   type ReportDownload,
 } from "../lib/report-export.ts";
 import {
@@ -25,9 +26,10 @@ const INPUT =
 const PRIMARY_BUTTON =
   "min-h-11 w-full rounded-full bg-[#534AB7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50 sm:w-auto";
 
-type ExportKind = "paid" | "pending" | "charges" | "cashflow";
+type ExportKind = "period" | "paid" | "pending" | "charges" | "cashflow";
 
 const EXPORTS: { kind: ExportKind; label: string; hint: string; icon: string }[] = [
+  { kind: "period", label: "Vendas do período", hint: "pagas e pendentes do período", icon: "🗓️" },
   { kind: "paid", label: "Vendas pagas", hint: "período das datas acima", icon: "💰" },
   { kind: "pending", label: "Vendas pendentes", hint: "todas em aberto", icon: "⏳" },
   { kind: "charges", label: "Cobranças", hint: "com situação de vencimento", icon: "🔔" },
@@ -41,6 +43,8 @@ function buildDownload(
   month: string
 ): ReportDownload {
   switch (kind) {
+    case "period":
+      return periodReportDownload(start, end);
     case "paid":
       return paidReportDownload(start, end);
     case "pending":
@@ -104,6 +108,30 @@ export function Reports() {
     void Promise.all([loadSalesReport(), loadOthers()]).finally(() => setLoading(false));
   }, [loadSalesReport, loadOthers]);
 
+  /**
+   * Ação do botão "Gerar": filtra a tabela E baixa o PDF do período escolhido.
+   *
+   * Antes o botão só recarregava os totais na tela — o usuário selecionava as
+   * datas, clicava em "Gerar" e nenhum arquivo era gerado, parecendo que a
+   * emissão por período estava quebrada. Os dois passos acontecem juntos, e a
+   * tabela é atualizada mesmo se o download falhar (com o erro à parte).
+   */
+  async function generatePeriod() {
+    setPdfFeedback(null);
+    setExporting("period");
+    try {
+      const { path, filename } = periodReportDownload(start, end);
+      await downloadReportPdf(path, filename);
+      setPdfFeedback({ ok: true, text: `Relatório baixado: ${filename}` });
+    } catch (err) {
+      setPdfFeedback({ ok: false, text: errorText(err) });
+    } finally {
+      setExporting(null);
+      // Atualiza os números da tela mesmo se o PDF não saiu.
+      await loadSalesReport();
+    }
+  }
+
   /** Emite o PDF do relatório escolhido e informa o resultado na tela. */
   async function exportPdf(kind: ExportKind) {
     setPdfFeedback(null);
@@ -135,7 +163,7 @@ export function Reports() {
       error={error}
       exporting={exporting}
       pdfFeedback={pdfFeedback}
-      onLoad={loadSalesReport}
+      onLoad={() => void generatePeriod()}
       onExport={exportPdf}
     />
   );
@@ -316,18 +344,31 @@ function ReportsPage({
           <button
             type="button"
             onClick={onLoad}
-            disabled={busy || periodInvalid}
+            disabled={busy || exporting !== null || periodInvalid}
             className={PRIMARY_BUTTON}
           >
-            {busy ? "Gerando…" : "Gerar"}
+            {exporting === "period" ? "Gerando PDF…" : busy ? "Gerando…" : "Gerar e baixar PDF"}
           </button>
         </div>
+
+        <p className="mt-2 text-xs text-zinc-400">
+          O botão “Gerar” filtra o período e baixa o PDF com todas as vendas
+          (pagas e pendentes) das datas selecionadas.
+        </p>
 
         {periodInvalid && (
           <p className="mt-2 text-xs text-[#FAC775]">
             A data inicial não pode ser maior que a data final.
           </p>
         )}
+
+        <p
+          aria-live="polite"
+          role="status"
+          className={`mt-2 text-xs ${pdfFeedback ? (pdfFeedback.ok ? "text-emerald-300" : "text-red-300") : "text-transparent"}`}
+        >
+          {pdfFeedback?.text ?? "—"}
+        </p>
 
         {loading && !report && <p className="mt-4 text-sm text-zinc-400">Carregando…</p>}
 

@@ -73,6 +73,19 @@ export function paidReportDownload(start: string, end: string): ReportDownload {
   };
 }
 
+/**
+ * Relatório de **todas** as vendas do período (pagas e pendentes) — é o PDF do
+ * botão "Gerar" do cartão "Vendas por período".
+ */
+export function periodReportDownload(start: string, end: string): ReportDownload {
+  assertValidPeriod(start, end);
+  const params = new URLSearchParams({ start, end });
+  return {
+    path: `/reports/period?${params.toString()}`,
+    filename: `vendas_periodo_${start}_a_${end}.pdf`,
+  };
+}
+
 /** Relatório de todas as vendas pendentes (sem filtro de período). */
 export function pendingReportDownload(): ReportDownload {
   return { path: "/reports/pending", filename: "vendas_pendentes.pdf" };

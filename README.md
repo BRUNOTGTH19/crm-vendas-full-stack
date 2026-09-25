@@ -74,6 +74,47 @@ A PWA incluye `manifest.json`, ícono e `sw.js` (cache-first para estáticos, ne
 
 Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) já existente na base local.
 
+## Relatórios em PDF (doc 2.5)
+
+Todos os relatórios são gerados sob demanda, em memória (ReportLab), e entregues
+como **download** (`Content-Disposition: attachment`, `Cache-Control: no-store`).
+
+| Endpoint | O quê | Parâmetros |
+| --- | --- | --- |
+| `GET /reports/period` | Todas as vendas do período (pagas e pendentes), com status e totalizadores | `start`, `end` (obrigatórios) |
+| `GET /reports/paid` | Somente vendas pagas | `start`, `end` (obrigatórios) |
+| `GET /reports/pending` | Todas as vendas em aberto | — |
+| `GET /reports/charges` | Cobranças com a situação de cada vencimento | — |
+| `GET /reports/cashflow` | Fechamento de caixa do mês | `month` (`AAAA-MM`, opcional) |
+
+Na tela **Relatórios**, o botão **“Gerar e baixar PDF”** do cartão *Vendas por
+período* filtra o período **e** baixa o PDF correspondente (`/reports/period`) —
+antes ele só atualizava os números na tela e nenhum arquivo era emitido.
+Período invertido (`start > end`) responde **400** nas duas rotas.
+
+Testes: `python -m pytest backend/tests/test_reports.py` (emissão, filtros de
+período/status, escopo por dono, validação e robustez do gerador).
+
+## Timeout de sessão por inatividade (2 minutos)
+
+Por segurança, a sessão do frontend expira após **2 minutos sem atividade**
+(clique, toque, tecla, rolagem, movimento do mouse ou foco na janela):
+
+- aos **30 segundos restantes** aparece um aviso com contagem regressiva e o
+  botão **“Continuar logado”** (com o aviso aberto, a atividade passa a ser
+  ignorada — só o botão renova a sessão);
+- se o prazo estourar, o token é apagado do `localStorage`, o usuário volta
+  para a tela de login e precisa informar e-mail e senha novamente;
+- a verificação roda a cada 1s e **também** em `visibilitychange`/`pageshow`,
+  porque navegadores congelam timers de abas em segundo plano.
+
+O token JWT do backend continua válido por 8h (`ACCESS_TOKEN_EXPIRE_MINUTES`):
+a expiração por inatividade é controlada no cliente
+(`frontend/src/lib/session-idle.ts` + `lib/use-idle-session.ts`), porque a
+autenticação é 100% JWT, sem estado no servidor.
+
+Testes: `npm test` em `frontend/` (`tests/session-idle.test.mjs`).
+
 ## Gestão de dados (admin)
 
 Usuários com papel **admin** têm acesso à área **Dados (admin)** (`#/admin/dados`),

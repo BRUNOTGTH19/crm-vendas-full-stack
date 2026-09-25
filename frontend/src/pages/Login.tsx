@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError, resetPassword, setSession } from "../lib/api.ts";
 import type { TokenResponse } from "../types.ts";
 
-export function Login() {
+export function Login({ notice = "" }: { notice?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -74,6 +74,15 @@ export function Login() {
           <h1 className="mt-4 text-2xl font-bold text-white">CRM PWA de Vendas</h1>
           <p className="mt-1 text-sm text-zinc-400">Acesse seu painel de vendas</p>
         </div>
+
+        {notice && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-[#BA7517]/40 bg-[#BA7517]/20 px-4 py-2.5 text-sm text-[#FAC775]"
+          >
+            {notice}
+          </div>
+        )}
 
         {ok && (
           <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-300">

@@ -9,6 +9,7 @@ import {
   monthLabel,
   paidReportDownload,
   pendingReportDownload,
+  periodReportDownload,
 } from "../src/lib/report-export.ts";
 import { currentMonthISO } from "../src/lib/format.ts";
 
@@ -42,6 +43,17 @@ test("cashflowReportDownload usa o mês e nomeia o arquivo com ele", () => {
     path: "/reports/cashflow?month=2026-09",
     filename: "fechamento_caixa_2026-09.pdf",
   });
+});
+
+test("periodReportDownload monta o endpoint do PDF do período", () => {
+  const download = periodReportDownload("2026-09-01", "2026-09-30");
+  assert.equal(download.path, "/reports/period?start=2026-09-01&end=2026-09-30");
+  assert.equal(download.filename, "vendas_periodo_2026-09-01_a_2026-09-30.pdf");
+});
+
+test("periodReportDownload valida o período antes de chamar a API", () => {
+  assert.throws(() => periodReportDownload("2026-09-30", "2026-09-01"), /data inicial/);
+  assert.throws(() => periodReportDownload("", "2026-09-30"), /data inicial e a data final/);
 });
 
 test("assertValidMonth aceita AAAA-MM e rejeita mês/ano fora de faixa", () => {

@@ -1,5 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { clearSession, getSessionUser } from "./lib/api.ts";
+import { useIdleSession } from "./lib/use-idle-session.ts";
+import { IDLE_LOGOUT_MESSAGE, secondsLeft } from "./lib/session-idle.ts";
 import { Layout } from "./components/Layout.tsx";
 import { Login } from "./pages/Login.tsx";
 import { Register } from "./pages/Register.tsx";
@@ -17,9 +19,39 @@ function currentPath(): string {
   return raw === "" ? "/" : raw;
 }
 
+/** Aviso de inatividade: o usuário pode continuar ou deixar a sessão encerrar. */
+function IdleWarning({ seconds, onKeepAlive }: { seconds: number; onKeepAlive: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+      <div
+        role="alertdialog"
+        aria-live="assertive"
+        aria-labelledby="idle-warning-title"
+        className="w-full max-w-sm rounded-3xl bg-[#26215C] p-6 text-center shadow-2xl"
+      >
+        <h2 id="idle-warning-title" className="text-lg font-bold text-white">
+          Sua sessão vai expirar
+        </h2>
+        <p className="mt-2 text-sm text-zinc-300">
+          Por segurança, o sistema fecha após 2 minutos sem atividade. Ela será
+          encerrada em <strong className="text-[#FAC775]">{seconds}s</strong>.
+        </p>
+        <button
+          type="button"
+          onClick={onKeepAlive}
+          className="mt-5 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4]"
+        >
+          Continuar logado
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactNode {
   const [path, setPath] = useState(currentPath());
   const [user, setUser] = useState(getSessionUser());
+  const [idleNotice, setIdleNotice] = useState("");
 
   useEffect(() => {
     const onChange = () => {
@@ -40,10 +72,25 @@ export function App(): ReactNode {
     };
   }, []);
 
+  /** Encerra a sessão local e avisa o motivo (inatividade vs. logout manual). */
+  const endSession = useCallback((message: string) => {
+    clearSession();
+    setUser(null);
+    setIdleNotice(message);
+    window.location.hash = "#/login";
+  }, []);
+
+  // Timeout de 2 minutos por inatividade: sem clicar em "Sair", o sistema se
+  // fecha sozinho e o próximo acesso exige e-mail e senha novamente.
+  const { state: idleState, keepAlive } = useIdleSession(
+    Boolean(user),
+    () => endSession(IDLE_LOGOUT_MESSAGE)
+  );
+
   const route = path.split("?")[0];
 
   if (!user) {
-    return route === "/register" ? <Register /> : <Login />;
+    return route === "/register" ? <Register /> : <Login notice={idleNotice} />;
   }
 
   const content = new Map<string, ReactNode>([
@@ -64,15 +111,20 @@ export function App(): ReactNode {
   const page = content.get(route) ?? content.get("/")!;
 
   return (
-    <Layout
-      user={user}
-      onLogout={() => {
-        clearSession();
-        setUser(null);
-        window.location.hash = "#/login";
-      }}
-    >
-      {page}
-    </Layout>
+    <>
+      <Layout
+        user={user}
+        onLogout={() => {
+          setIdleNotice("");
+          endSession("");
+        }}
+      >
+        {page}
+      </Layout>
+
+      {idleState.warning && (
+        <IdleWarning seconds={secondsLeft(idleState)} onKeepAlive={keepAlive} />
+      )}
+    </>
   );
 }

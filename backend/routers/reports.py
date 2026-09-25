@@ -255,6 +255,58 @@ def cashflow_report_pdf(
     return _pdf_response(pdf, f"fechamento_caixa_{year}-{mon:02d}.pdf")
 
 
+@router.get("/period")
+def period_report_pdf(
+    start: date = Query(..., description="Data inicial (YYYY-MM-DD)"),
+    end: date = Query(..., description="Data final (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    owner_id: int | None = Depends(resolve_data_owner),
+):
+    """Relatório PDF de **todas** as vendas do período (pagas e pendentes).
+
+    É o PDF correspondente ao cartão "Vendas por período" da tela: o botão
+    "Gerar" filtrava a tabela, mas não existia arquivo para baixar — por isso a
+    emissão por período parecia quebrada mesmo com as datas selecionadas.
+    Traz status e totalizadores de pago/pendente para o período.
+    """
+    _validate_period(start, end)
+    sales = (
+        scoped(db.query(Sale), Sale.user_id, owner_id)
+        .filter(
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
+        )
+        .order_by(Sale.sale_date, Sale.id)
+        .all()
+    )
+    rows = [
+        [
+            f"#{s.id}",
+            _client_name(s),
+            s.sale_date.strftime("%d/%m/%Y"),
+            "Paga" if s.status == SaleStatus.paid else "Pendente",
+            f"R$ {float(s.total):.2f}",
+        ]
+        for s in sales
+    ]
+    paid_total = sum(float(s.total) for s in sales if s.status == SaleStatus.paid)
+    pending_total = sum(float(s.remaining) for s in sales if s.status == SaleStatus.pending)
+    total = sum(float(s.total) for s in sales)
+    pdf = build_report_pdf(
+        "Relatório de Vendas por Período",
+        f"Período: {start.strftime('%d/%m/%Y')} a {end.strftime('%d/%m/%Y')}",
+        ["Venda", "Cliente", "Data", "Status", "Valor"],
+        rows,
+        [
+            f"VENDAS NO PERÍODO: {len(sales)}",
+            f"TOTAL RECEBIDO: R$ {paid_total:.2f}",
+            f"TOTAL PENDENTE: R$ {pending_total:.2f}",
+            f"TOTAL GERAL: R$ {total:.2f}",
+        ],
+    )
+    return _pdf_response(pdf, f"relatorio_vendas_{start.isoformat()}_a_{end.isoformat()}.pdf")
+
+
 @router.get("/sales")
 def sales_report(
     start: date = Query(..., description="Data inicial (YYYY-MM-DD)"),

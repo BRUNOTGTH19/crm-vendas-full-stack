@@ -39,6 +39,7 @@ client = TestClient(app)
 
 PDF_ROUTES = [
     "/reports/paid?start=2026-01-01&end=2026-12-31",
+    "/reports/period?start=2026-01-01&end=2026-12-31",
     "/reports/pending",
     "/reports/charges",
     "/reports/cashflow?month=2026-09",
@@ -197,6 +198,10 @@ def test_reports_require_authentication(path):
     ("path", "filename"),
     [
         ("/reports/paid?start=2026-01-01&end=2026-12-31", "relatorio_vendas_pagas.pdf"),
+        (
+            "/reports/period?start=2026-01-01&end=2026-12-31",
+            "relatorio_vendas_2026-01-01_a_2026-12-31.pdf",
+        ),
         ("/reports/pending", "relatorio_vendas_pendentes.pdf"),
         ("/reports/charges", "relatorio_cobrancas.pdf"),
         ("/reports/cashflow?month=2026-09", "fechamento_caixa_2026-09.pdf"),
@@ -356,6 +361,7 @@ def test_invalid_month_returns_400_instead_of_500(owner, month):
     "path",
     [
         "/reports/paid?start=2026-09-30&end=2026-09-01",
+        "/reports/period?start=2026-09-30&end=2026-09-01",
         "/reports/sales?start=2026-09-30&end=2026-09-01",
     ],
 )
@@ -367,10 +373,80 @@ def test_inverted_period_returns_400(owner, path):
 
 @pytest.mark.parametrize(
     "path",
-    ["/reports/paid", "/reports/paid?start=2026-09-01", "/reports/sales?end=2026-09-30"],
+    [
+        "/reports/paid",
+        "/reports/paid?start=2026-09-01",
+        "/reports/period?start=2026-09-01",
+        "/reports/sales?end=2026-09-30",
+    ],
 )
 def test_missing_period_parameters_return_422(owner, path):
     assert client.get(path, headers=owner["headers"]).status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Emissão por período (PDF do botão "Gerar")
+# ---------------------------------------------------------------------------
+def test_period_report_includes_paid_and_pending_of_the_period(owner, pdf_spy):
+    """O PDF do período traz todas as vendas (pagas e pendentes) do intervalo.
+
+    Regressão do bug reportado: o usuário selecionava as datas e clicava em
+    "Gerar" e nenhum arquivo era emitido — o cartão "Vendas por período"
+    filtrava a tela, mas não tinha endpoint de PDF correspondente.
+    """
+    cid = _create_client(owner["headers"], "Cliente Periodo Emitido")
+    dentro_paga = _create_sale(
+        owner["headers"],
+        cid,
+        sale_date="2026-06-10",
+        status="paid",
+        unit_price="80.00",
+    )
+    dentro_pendente = _create_sale(
+        owner["headers"],
+        cid,
+        sale_date="2026-06-20",
+        status="pending",
+        due_date="2026-07-20",
+        unit_price="30.00",
+    )
+    fora = _create_sale(owner["headers"], cid, sale_date="2026-08-01", status="paid")
+
+    r = client.get(
+        "/reports/period?start=2026-06-01&end=2026-06-30", headers=owner["headers"]
+    )
+    assert r.status_code == 200, r.text
+    assert r.content.startswith(b"%PDF-")
+
+    call = pdf_spy[0]
+    assert call["title"] == "Relatório de Vendas por Período"
+    assert call["subtitle"] == "Período: 01/06/2026 a 30/06/2026"
+    assert call["headers"] == ["Venda", "Cliente", "Data", "Status", "Valor"]
+    assert [row[0] for row in call["rows"]] == [f"#{dentro_paga}", f"#{dentro_pendente}"]
+    assert f"#{fora}" not in [row[0] for row in call["rows"]]
+    assert call["rows"][0][3] == "Paga"
+    assert call["rows"][1][3] == "Pendente"
+    assert call["footers"] == [
+        "VENDAS NO PERÍODO: 2",
+        "TOTAL RECEBIDO: R$ 80.00",
+        "TOTAL PENDENTE: R$ 30.00",
+        "TOTAL GERAL: R$ 110.00",
+    ]
+
+
+def test_period_report_is_scoped_to_the_owner(owner, other_user, pdf_spy):
+    meu_cliente = _create_client(owner["headers"], "Cliente Do Periodo")
+    _create_sale(owner["headers"], meu_cliente, sale_date="2026-06-05", status="paid")
+
+    cliente_alheio = _create_client(other_user["headers"], "Cliente Alheio Do Periodo")
+    _create_sale(other_user["headers"], cliente_alheio, sale_date="2026-06-06", status="paid")
+
+    r = client.get(
+        "/reports/period?start=2026-06-01&end=2026-06-30", headers=owner["headers"]
+    )
+    assert r.status_code == 200, r.text
+    nomes = {row[1] for row in pdf_spy[0]["rows"]}
+    assert nomes == {"Cliente Do Periodo"}
 
 
 # ---------------------------------------------------------------------------

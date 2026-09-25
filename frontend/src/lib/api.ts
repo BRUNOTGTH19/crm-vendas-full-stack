@@ -148,6 +148,38 @@ export function resetPassword(email: string, newPassword: string): Promise<void>
 }
 
 /**
+ * iOS/Safari ignora (ou abre em preview) o atributo `download` de blobs, e o
+ * clique se perde — o usuário fica com a tela parada e nenhum PDF salvo. Nesses
+ * navegadores abrimos o arquivo em nova aba, onde ele pode ser salvo.
+ */
+function prefersNewTabDownload(): boolean {
+  const ua = navigator.userAgent ?? "";
+  return /iPhone|iPad|iPod/i.test(ua) || (/Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua));
+}
+
+/**
+ * Dispara o download de um blob: clique no elemento `<a download>` (caminho
+ * padrão) e, em navegadores que não suportam isso, abertura em nova aba.
+ */
+function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  if (prefersNewTabDownload()) {
+    window.open(url, "_blank", "noopener");
+  } else {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+  // Alguns navegadores móveis ainda estão processando o download quando o
+  // click retorna; revogar imediatamente pode salvar um PDF corrompido.
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
  * Baixa qualquer endpoint de relatório PDF (doc 2.5) e dispara o download.
  *
  * Valida que a resposta é realmente um PDF: se um proxy/backend devolver
@@ -189,17 +221,7 @@ export async function downloadReportPdf(path: string, filename: string): Promise
   }
 
   const blob = new Blob([bytes], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Alguns navegadores móveis ainda estão processando o download quando o
-  // click retorna; revogar imediatamente pode salvar um PDF corrompido.
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  saveBlob(blob, filename);
 }
 
 /**
