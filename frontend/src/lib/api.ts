@@ -1,4 +1,5 @@
 import type { CollectionMessage, CollectionReminder, TokenResponse, User } from "../types.ts";
+import { describeReportError } from "./report-export.ts";
 
 /**
  * URL base de la API. En desarrollo, Vite hace proxy de `/api` hacia
@@ -220,7 +221,7 @@ export async function downloadReportPdf(path: string, filename: string): Promise
       /* mantém mensagem padrão */
     }
     aba?.close();
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, describeReportError(res.status, detail));
   }
 
   const contentType = res.headers.get("content-type") ?? "";

@@ -6,6 +6,7 @@ import {
   assertValidPeriod,
   cashflowReportDownload,
   chargesReportDownload,
+  describeReportError,
   monthLabel,
   paidReportDownload,
   pendingReportDownload,
@@ -80,4 +81,25 @@ test("monthLabel traduz o mês por extenso em pt-BR", () => {
 test("currentMonthISO devolve AAAA-MM do mês corrente", () => {
   assert.match(currentMonthISO(), /^\d{4}-\d{2}$/);
   assert.equal(currentMonthISO(), new Date().toISOString().slice(0, 7));
+});
+
+test("404 vira mensagem de backend desatualizado, não 'Not Found'", () => {
+  // Regressão do que o usuário viu no celular: o FastAPI respondia
+  // {"detail":"Not Found"} e a tela mostrava só isso.
+  const mensagem = describeReportError(404, "Not Found");
+  assert.doesNotMatch(mensagem, /Not Found/);
+  assert.match(mensagem, /backend/i);
+  assert.match(mensagem, /deploy/i);
+});
+
+test("401/403, 429 e 5xx têm mensagens próprias", () => {
+  assert.match(describeReportError(401, "Token expirado"), /login/i);
+  assert.match(describeReportError(403, "Acesso restrito"), /permissão/i);
+  assert.match(describeReportError(429, "Muitas tentativas"), /instantes/i);
+  assert.match(describeReportError(500, "Erro interno"), /indisponível|iniciando/i);
+  assert.match(describeReportError(503, "Service Unavailable"), /indisponível|i/);
+});
+
+test("qualquer outro status preserva o detalhe do servidor", () => {
+  assert.equal(describeReportError(400, "Período inválido"), "Período inválido");
 });

@@ -1,0 +1,19 @@
+fix(relatorios): erro 404 do PDF vira mensagem util em vez de "Not Found"
+
+Testado no Android: ao clicar em "Gerar", a tela mostrava apenas
+"Not Found". Causa: o backend publicado ainda nao tinha a rota
+/reports/period, e o FastAPI responde {"detail":"Not Found"} — mensagem
+que nao diz nada e faz parecer que o relatorio esta quebrado.
+
+- describeReportError() traduz o status em orientacao acionavel:
+  404 = backend precisa de deploy; 401/403 = login/permissao;
+  429 = aguarde; 500/502/503/504 = servidor iniciando/indisponivel;
+  qualquer outro status preserva o detalhe do servidor;
+- o download de PDF passa a usar essa traducao ao montar o ApiError;
+- 3 testes novos cobrem o 404 e os demais status.
+
+O caminho local foi validado de ponta a ponta com User-Agent de Android
+(login -> criar venda -> GET /reports/period = 200 e %PDF-): o codigo
+responde corretamente; o que faltava era o deploy do backend.
+
+Testes: 41 node --test, typecheck e build OK.

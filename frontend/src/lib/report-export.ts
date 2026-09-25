@@ -112,3 +112,27 @@ export function monthLabel(month: string): string {
   const [year, monthNumber] = valid.split("-");
   return `${MONTH_NAMES[Number(monthNumber) - 1]} de ${year}`;
 }
+
+/**
+ * Traduz falhas HTTP do download de PDF em algo acionável.
+ *
+ * O caso do **404** é o que mais engana: o FastAPI responde `{"detail":"Not
+ * Found"}` quando a rota ainda não existe no backend publicado (deploy do
+ * servidor atrasado, ou URL da API apontando para outro serviço). Sem esta
+ * tradução o usuário lê só "Not Found" e acha que o relatório está quebrado.
+ */
+export function describeReportError(status: number, detail: string): string {
+  if (status === 404) {
+    return "Este relatório ainda não existe no servidor. O backend precisa ser atualizado (deploy) para emitir o PDF do período.";
+  }
+  if (status === 401 || status === 403) {
+    return "Sessão expirada ou sem permissão. Faça login novamente e tente de novo.";
+  }
+  if (status === 429) {
+    return "Muitas tentativas. Aguarde alguns instantes e tente novamente.";
+  }
+  if ([500, 502, 503, 504].includes(status)) {
+    return "O servidor está temporariamente indisponível (pode estar iniciando). Tente novamente em alguns instantes.";
+  }
+  return detail;
+}
