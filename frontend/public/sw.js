@@ -1,5 +1,8 @@
 /* Service Worker: somente arquivos públicos estáticos são armazenados offline. */
-const CACHE = "crm-vendas-cache-v3";
+// v4: renomeado a cada mudança visível do app — o `activate` apaga os caches
+// antigos, senão o celular continuaria servindo um bundle velho (cache-first)
+// mesmo depois do deploy.
+const CACHE = "crm-vendas-cache-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

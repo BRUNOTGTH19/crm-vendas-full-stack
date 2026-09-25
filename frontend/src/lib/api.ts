@@ -158,35 +158,46 @@ function prefersNewTabDownload(): boolean {
 }
 
 /**
- * Dispara o download de um blob: clique no elemento `<a download>` (caminho
- * padrão) e, em navegadores que não suportam isso, abertura em nova aba.
+ * Aba em branco para receber o PDF depois do `fetch` (ver `downloadReportPdf`).
+ *
+ * Aberta **dentro do gesto do usuário** e sem `noopener`: precisamos da
+ * referência à aba para apontá-la até o blob — `noopener` devolveria `null` — e
+ * `about:blank` herda a origem de quem abriu, então apontá-la para o blob do
+ * próprio app é permitido pelo navegador.
  */
-function saveBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  if (prefersNewTabDownload()) {
-    window.open(url, "_blank", "noopener");
-  } else {
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.rel = "noopener";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+function openBlankTab(): Window | null {
+  try {
+    return window.open("", "_blank");
+  } catch {
+    return null;
   }
-  // Alguns navegadores móveis ainda estão processando o download quando o
-  // click retorna; revogar imediatamente pode salvar um PDF corrompido.
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Download padrão: clique no `<a download>` (Chrome, Android, desktop). */
+function anchorDownload(url: string, filename: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 /**
- * Baixa qualquer endpoint de relatório PDF (doc 2.5) e dispara o download.
+ * Baixa qualquer endpoint de relatório PDF (doc 2.5) e mostra o arquivo.
  *
  * Valida que a resposta é realmente um PDF: se um proxy/backend devolver
  * HTML ou JSON com status 200, o navegador salvaria um arquivo inválido —
  * era assim que o usuário "não conseguia emitir o relatório".
+ *
+ * No iOS/Safari a aba é aberta **antes** do `fetch`, ainda dentro do clique.
+ * Abrir depois do `await` perde o "gesto do usuário" e o bloqueador de pop-ups
+ * do Safari cancela a abertura — o clique pareceria não fazer nada, que é
+ * exatamente o sintoma reportado no celular.
  */
 export async function downloadReportPdf(path: string, filename: string): Promise<void> {
+  const aba = prefersNewTabDownload() ? openBlankTab() : null;
   const headers: Record<string, string> = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
   };
@@ -197,6 +208,7 @@ export async function downloadReportPdf(path: string, filename: string): Promise
   try {
     res = await fetch(apiUrl(path), { headers });
   } catch {
+    aba?.close();
     throw connectionError();
   }
   if (!res.ok) {
@@ -207,21 +219,31 @@ export async function downloadReportPdf(path: string, filename: string): Promise
     } catch {
       /* mantém mensagem padrão */
     }
+    aba?.close();
     throw new ApiError(res.status, detail);
   }
 
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/pdf")) {
+    aba?.close();
     throw reportPdfError("O servidor não devolveu um PDF. Tente novamente em instantes.");
   }
 
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes.length < 5 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") {
+    aba?.close();
     throw reportPdfError("O arquivo recebido não é um PDF válido. Tente novamente.");
   }
 
-  const blob = new Blob([bytes], { type: "application/pdf" });
-  saveBlob(blob, filename);
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  if (aba && !aba.closed) {
+    aba.location.href = url;
+  } else {
+    anchorDownload(url, filename);
+  }
+  // Margem-generosa antes de revogar: no celular a aba pode demorar a abrir o
+  // blob, e revogar cedo salva um PDF corrompido (ou nem salva).
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**
