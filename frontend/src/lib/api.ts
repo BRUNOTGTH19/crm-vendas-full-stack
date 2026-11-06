@@ -415,3 +415,31 @@ export function adminListUsers(): Promise<AdminUser[]> {
 export function adminDeleteUser(userId: number): Promise<AdminUserDeleteResult> {
   return api.del<AdminUserDeleteResult>(`/admin/users/${userId}`, { confirm: true });
 }
+
+// ---------------------------------------------------------------------------
+// Assistente de IA (a chave fica somente no backend)
+// ---------------------------------------------------------------------------
+
+export interface AiChatResponse {
+  reply: string;
+}
+
+export interface AiStatusMessageInput {
+  motivo: string;
+  cliente?: string | null;
+  pedido?: string | null;
+}
+
+export interface AiStatusMessageResponse {
+  message: string;
+}
+
+/** Consulta dados do usuário logado via tools fixas do backend. */
+export function aiChat(message: string): Promise<AiChatResponse> {
+  return api.post<AiChatResponse>("/ai/chat", { message });
+}
+
+/** Gera uma frase de status para revisão/cópia. Nada é gravado ou enviado. */
+export function aiStatusMessage(input: AiStatusMessageInput): Promise<AiStatusMessageResponse> {
+  return api.post<AiStatusMessageResponse>("/ai/status-message", input);
+}

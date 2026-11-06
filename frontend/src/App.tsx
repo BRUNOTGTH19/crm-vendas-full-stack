@@ -3,6 +3,7 @@ import { clearSession, getSessionUser } from "./lib/api.ts";
 import { useIdleSession } from "./lib/use-idle-session.ts";
 import { IDLE_LOGOUT_MESSAGE, secondsLeft } from "./lib/session-idle.ts";
 import { Layout } from "./components/Layout.tsx";
+import { AiChat } from "./components/AiChat.tsx";
 import { Login } from "./pages/Login.tsx";
 import { Register } from "./pages/Register.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
@@ -121,6 +122,8 @@ export function App(): ReactNode {
       >
         {page}
       </Layout>
+
+      <AiChat />
 
       {idleState.warning && (
         <IdleWarning seconds={secondsLeft(idleState)} onKeepAlive={keepAlive} />
