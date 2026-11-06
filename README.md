@@ -55,6 +55,65 @@ Placeholders: `{cliente}`, `{venda}`, `{valor}`, `{vencimento}`, `{situacao}`, `
 No PWA, a tela **Cobranças** exibe o banner de alerta e o botão **Cobrar** que abre
 o modal com a mensagem editável, **Copiar**, **Baixar PDF** e **Abrir WhatsApp**.
 
+## Assistente de IA (opcional)
+
+O botão flutuante **Assistente** aparece em todas as telas logadas (inclusive no
+celular) e abre um painel com dois modos:
+
+- **Consultar dados** — a IA escolhe uma das ferramentas fixas, o backend executa
+  a consulta com SQLAlchemy e devolve a resposta em linguagem natural;
+- **Criar status** — gera uma frase curta para o usuário revisar e copiar.
+
+Endpoints (ambos exigem `Authorization: Bearer <JWT>`):
+
+| Endpoint | O quê |
+| --- | --- |
+| `POST /ai/chat` | Chat com function calling. Corpo: `{"message": "..."}`. |
+| `POST /ai/status-message` | Frase de status. Corpo: `{"motivo": "...", "cliente": "...", "pedido": "..."}`. |
+
+Ferramentas disponíveis, todas **somente leitura**:
+
+- `get_sales_summary(inicio, fim)` — totais agregados do usuário logado;
+- `list_overdue()` — cobranças vencidas, sem telefone/e-mail/nome do cliente;
+- `get_sale_status(sale_id)` — status de uma venda do próprio usuário.
+
+Regras de segurança implementadas:
+
+- o `user_id` vem **sempre do JWT**, nunca dos argumentos do modelo. Os schemas
+  das tools usam `extra="forbid"`; enviar `user_id` é rejeitado;
+- argumentos são validados com Pydantic (datas ISO, intervalo de até 366 dias,
+  `sale_id` inteiro positivo);
+- no máximo **3 rodadas** de tool calls e **3 tools** por requisição;
+- cache Redis por `(user_id, ferramenta, parâmetros)` para leituras repetidas;
+- HTTP 429 do provedor free tier vira **429** com mensagem amigável; ausência de
+  configuração vira **503** genérico (sem revelar variável ou valor);
+- prompts, respostas e chave **não são registrados em log**;
+- CPF/CNPJ, e-mail, telefone e sequências longas de dígitos são redigidos da
+  entrada antes do envio; a saída é renderizada como texto (sem HTML);
+- a IA não cria, altera ou exclui registros e não gera SQL livre.
+
+Configuração no **Render → Environment** (Web Service do backend):
+
+| Variável | Exemplo/observação |
+| --- | --- |
+| `AI_API_URL` | URL **completa** do endpoint OpenAI-compatível, ex.: `https://api.groq.com/openai/v1/chat/completions` |
+| `AI_API_KEY` | chave do provedor (Groq/Gemini). Nunca versionar |
+| `AI_MODEL` | modelo disponível no provedor, ex.: `llama-3.1-8b-instant` |
+
+Para Gemini, use o endpoint OpenAI-compatível
+`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` e um
+modelo disponível na sua conta. A chave fica **somente no Render**; a Vercel não
+recebe `AI_API_KEY`. Sem essas variáveis o restante do CRM continua funcionando
+e o assistente responde 503.
+
+Testes do backend (sem banco de produção e com provedor/Redis simulados):
+
+```bash
+python -m pytest tests/test_ai.py
+```
+
+Não há migration Alembic: o assistente não cria tabelas nem grava dados.
+
 ## Frontend
 
 Requisitos: Node 20+.
@@ -188,6 +247,10 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
      as chaves automaticamente no banco na primeira chamada** — funciona sem
      configuração manual, mas definir explicitamente é recomendado para
      controlar a rotação das chaves.
+   - **Assistente de IA (opcional):** `AI_API_URL` (URL completa do endpoint
+     OpenAI-compatível), `AI_API_KEY` e `AI_MODEL`. Sem elas, o assistente
+     responde 503 e o restante do CRM continua normal. A chave fica **apenas
+     no Render**, nunca na Vercel.
 8. Deploy — aguardar o build finalizar
 9. Rodar migrations: no Render Shell executar `alembic upgrade head`
    (cria as tabelas `push_subscriptions` e `app_settings`)
