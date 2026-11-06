@@ -14,6 +14,7 @@ from middleware.rate_limit import (
 )
 from routers import (
     admin,
+    ai,
     auth,
     clients,
     collections,
@@ -147,6 +148,7 @@ app.include_router(payments.router)
 app.include_router(collections.router)
 app.include_router(push.router)
 app.include_router(admin.router)
+app.include_router(ai.router)
 
 
 @app.get("/")
