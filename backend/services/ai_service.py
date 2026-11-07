@@ -543,6 +543,18 @@ async def generate_chat_reply(db: Session, user_id: int, message: str) -> str:
         )
         if not calls:
             reply = _clean_reply(content)
+            if not reply and calls_used:
+                # Modelos de raciocínio podem devolver content vazio depois de
+                # receber o resultado da ferramenta. Uma última chamada SEM
+                # ferramentas força a síntese em texto (recomendação da Groq).
+                _assistant, content, _ignored = await _complete(
+                    config,
+                    messages,
+                    tools=None,
+                    max_tokens=CHAT_MAX_TOKENS,
+                    temperature=0.2,
+                )
+                reply = _clean_reply(content)
             if not reply:
                 raise AIProviderError("O provedor não retornou texto.")
             logger.info("ai_chat_completed user_id=%s tool_calls=%s", user_id, calls_used)

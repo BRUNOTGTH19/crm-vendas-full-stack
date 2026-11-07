@@ -306,6 +306,30 @@ def test_overdue_list_only_returns_own_pending_sales(monkeypatch, seed):
     assert "email" not in json.dumps(result)
 
 
+def test_chat_forces_text_round_when_reasoning_model_returns_empty(monkeypatch, seed):
+    """GPT-OSS pode devolver content vazio após a ferramenta; a retry sem tools resolve."""
+    _configure_ai(monkeypatch)
+    provider = AsyncMock(
+        side_effect=[
+            _completion(tool_calls=[_tool_call("call_1", "list_overdue", {})]),
+            _completion(),  # content vazio (modelo de raciocínio)
+            _completion("Resposta final em texto."),
+        ]
+    )
+    monkeypatch.setattr(ai_service, "_request_chat_completion", provider)
+
+    response = client.post(
+        "/ai/chat",
+        json={"message": "Quais cobranças estão atrasadas?"},
+        headers=_auth(seed["user_a"]),
+    )
+    assert response.status_code == 200
+    assert response.json()["reply"] == "Resposta final em texto."
+    assert provider.await_count == 3
+    # A chamada de desempate não oferece ferramentas, forçando texto.
+    assert "tools" not in provider.await_args_list[-1].args[1]
+
+
 def test_sale_status_from_another_user_is_not_found(monkeypatch, seed):
     _configure_ai(monkeypatch)
     provider = AsyncMock(
