@@ -42,11 +42,11 @@ from models.sale import Sale, SaleStatus
 logger = logging.getLogger(__name__)
 
 AI_TIMEOUT_SECONDS = 18.0
-CHAT_MAX_TOKENS = 400
+CHAT_MAX_TOKENS = 1024
 # Modelos de raciocínio (ex.: GPT-OSS no Groq) gastam tokens "pensando" antes
-# de emitir o texto final. Com 100 tokens o content voltava vazio; 400 dá folga
-# para o raciocínio + as 2 frases pedidas no prompt.
-STATUS_MAX_TOKENS = 400
+# de emitir o texto final. Com 100 tokens o content voltava vazio e com 400
+# ainda saía truncado; 1024 é o padrão recomendado pela Groq para GPT-OSS.
+STATUS_MAX_TOKENS = 1024
 MAX_REPLY_CHARS = 4000
 MAX_TOOL_ROUNDS = 3
 MAX_TOOL_CALLS = 3
@@ -495,6 +495,11 @@ async def _complete(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    # GPT-OSS (Groq) é um modelo de raciocínio: sem controlar o esforço ele
+    # consome boa parte do limite "pensando" e o texto final sai vazio/cortado.
+    # O parâmetro é específico desse modelo; outros provedores não o recebem.
+    if config.model.startswith("openai/gpt-oss"):
+        payload["reasoning_effort"] = "low"
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
