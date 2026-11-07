@@ -133,6 +133,14 @@ A PWA incluye `manifest.json`, ícono e `sw.js` (cache-first para estáticos, ne
 
 Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) já existente na base local.
 
+### Redefinição de senha com token
+
+O admin gera um token de uso único (15 minutos) em **Dados (admin) → Usuários**.
+O usuário confirma em `#/reset-password`. Qualquer troca de senha invalida os
+access e refresh tokens emitidos antes dela. Veja o fluxo completo, as decisões
+de segurança e o passo de migration no Render em
+[`docs/password-reset-token.md`](docs/password-reset-token.md).
+
 ## Relatórios em PDF (doc 2.5)
 
 Todos os relatórios são gerados sob demanda, em memória (ReportLab), e entregues
