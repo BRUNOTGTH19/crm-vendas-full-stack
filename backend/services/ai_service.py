@@ -423,6 +423,28 @@ def execute_tool(
     return result
 
 
+def _provider_error_detail(response: httpx.Response) -> str:
+    """Resumo seguro do erro do provedor: só status e código/tipo.
+
+    O corpo de erro pode conter prompt, geração do modelo ou detalhes internos;
+    por isso apenas ``error.code``/``error.type`` (quando string curta) é
+    reproduzido. Nunca inclui cabeçalhos, chave ou mensagens do usuário.
+    """
+    base = f"HTTP {response.status_code}"
+    try:
+        data = response.json()
+    except ValueError:
+        return base
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return base
+    for key in ("code", "type"):
+        value = error.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", value):
+            return f"{base} {value}"
+    return base
+
+
 async def _request_chat_completion(config: AIConfig, payload: dict[str, Any]) -> dict[str, Any]:
     """POST no endpoint OpenAI-compatível. Não registra corpo nem cabeçalhos."""
     headers = {
@@ -441,7 +463,7 @@ async def _request_chat_completion(config: AIConfig, payload: dict[str, Any]) ->
     if response.status_code == 429:
         raise AIProviderRateLimitError("Quota do provedor de IA atingida.")
     if response.status_code >= 400:
-        raise AIProviderError(f"Provedor de IA respondeu HTTP {response.status_code}.")
+        raise AIProviderError(f"Provedor de IA respondeu {_provider_error_detail(response)}.")
     try:
         data = response.json()
     except ValueError as exc:

@@ -55,11 +55,17 @@ async def chat_endpoint(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=RATE_LIMIT_MESSAGE,
         ) from None
-    except ai_service.AIProviderError:
-        logger.warning("ai_provider_error user_id=%s", current_user.id)
+    except ai_service.AIProviderError as exc:
+        logger.warning("ai_provider_error user_id=%s reason=%s", current_user.id, exc)
+        # Detalhe só para admin: ajuda a diagnosticar configuração do provedor
+        # sem expor nada a usuários comuns. O texto vem de _provider_error_detail
+        # e contém apenas status HTTP + código/tipo do erro.
+        detail = PROVIDER_ERROR_MESSAGE
+        if current_user.role == "admin":
+            detail = f"{PROVIDER_ERROR_MESSAGE} [{exc}]"
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=PROVIDER_ERROR_MESSAGE,
+            detail=detail,
         ) from None
     except ValueError as exc:
         raise HTTPException(
@@ -94,11 +100,17 @@ async def status_message_endpoint(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=RATE_LIMIT_MESSAGE,
         ) from None
-    except ai_service.AIProviderError:
-        logger.warning("ai_provider_error user_id=%s", current_user.id)
+    except ai_service.AIProviderError as exc:
+        logger.warning("ai_provider_error user_id=%s reason=%s", current_user.id, exc)
+        # Detalhe só para admin: ajuda a diagnosticar configuração do provedor
+        # sem expor nada a usuários comuns. O texto vem de _provider_error_detail
+        # e contém apenas status HTTP + código/tipo do erro.
+        detail = PROVIDER_ERROR_MESSAGE
+        if current_user.role == "admin":
+            detail = f"{PROVIDER_ERROR_MESSAGE} [{exc}]"
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=PROVIDER_ERROR_MESSAGE,
+            detail=detail,
         ) from None
     except ValueError as exc:
         raise HTTPException(
