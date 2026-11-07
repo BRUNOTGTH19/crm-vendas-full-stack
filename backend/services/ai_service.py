@@ -43,7 +43,10 @@ logger = logging.getLogger(__name__)
 
 AI_TIMEOUT_SECONDS = 18.0
 CHAT_MAX_TOKENS = 400
-STATUS_MAX_TOKENS = 100
+# Modelos de raciocínio (ex.: GPT-OSS no Groq) gastam tokens "pensando" antes
+# de emitir o texto final. Com 100 tokens o content voltava vazio; 400 dá folga
+# para o raciocínio + as 2 frases pedidas no prompt.
+STATUS_MAX_TOKENS = 400
 MAX_REPLY_CHARS = 4000
 MAX_TOOL_ROUNDS = 3
 MAX_TOOL_CALLS = 3
