@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from cache import invalidate_data_cache
 from models.audit_log import AuditLog
 from models.client import Client
+from models.password_reset_token import PasswordResetToken
 from models.payment import Payment
 from models.push_subscription import PushSubscription
 from models.sale import Sale
@@ -31,8 +32,8 @@ from schemas.admin import (
     PushSubscriptionExport,
     SaleExport,
     SaleItemExport,
-    UserListItem,
     UserDeleteResult,
+    UserListItem,
 )
 
 
@@ -258,8 +259,11 @@ def delete_user(db: Session, user_id: int, admin_id: int, confirm: bool) -> User
     if client_ids:
         db.query(Client).filter(Client.id.in_(client_ids)).delete(synchronize_session=False)
 
-    # Audit logs do usuário
+    # Audit logs e tokens de redefinição do usuário
     db.query(AuditLog).filter(AuditLog.user_id == user_id).delete(synchronize_session=False)
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user_id
+    ).delete(synchronize_session=False)
 
     # Por fim, o próprio usuário
     db.delete(user)

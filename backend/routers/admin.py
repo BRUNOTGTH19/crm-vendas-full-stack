@@ -7,6 +7,7 @@ Todas as rotas exigem o papel ``admin`` (dependência ``require_admin``):
 - POST /admin/database/import  — reinsere dados a partir do JSON exportado
 - GET  /admin/users            — lista todos os usuários
 - DELETE /admin/users/{user_id} — exclui um usuário comum
+- POST /admin/users/{user_id}/reset-token — gera token de redefinição de senha
 """
 import json
 
@@ -30,7 +31,8 @@ from schemas.admin import (
     UserDeleteResult,
     UserListItem,
 )
-from services import admin_service
+from schemas.user import PasswordResetTokenResponse
+from services import admin_service, auth_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -168,6 +170,36 @@ def list_users_endpoint(
 ):
     """Lista todos os usuários do sistema (somente administradores)."""
     return admin_service.list_users(db)
+
+
+@router.post(
+    "/users/{user_id}/reset-token",
+    response_model=PasswordResetTokenResponse,
+    responses={status.HTTP_400_BAD_REQUEST: {"model": None}, status.HTTP_404_NOT_FOUND: {"model": None}},
+)
+def create_reset_token_endpoint(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Gera um token de redefinição de senha para outro usuário.
+
+    O token em texto aparece apenas nesta resposta; o banco guarda somente o
+    hash SHA-256. Um novo token invalida os anteriores ainda pendentes.
+    """
+    try:
+        result = auth_service.create_password_reset_token(db, current_user.id, user_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return PasswordResetTokenResponse.model_validate(result)
 
 
 @router.delete(

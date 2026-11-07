@@ -90,8 +90,8 @@ async def login_rate_limit(request: Request, call_next):
 
     Apenas tentativas FALHAS são contadas — usuários legítimos que logam
     com sucesso nunca são bloqueados. A redefinição de senha tem seu próprio
-    contador (10 chamadas por IP em 10 minutos), porque cada chamada troca
-    uma senha.
+    contador (10 chamadas por IP em 10 minutos), compartilhado entre o endpoint
+    antigo e a confirmação por token, porque cada chamada troca uma senha.
     """
     if request.method == "POST" and request.url.path == "/auth/login":
         key = _login_client_key(request)
@@ -107,7 +107,10 @@ async def login_rate_limit(request: Request, call_next):
             record_login_failure(key)
         return response
 
-    if request.method == "POST" and request.url.path == "/auth/reset-password":
+    if request.method == "POST" and request.url.path in {
+        "/auth/reset-password",
+        "/auth/reset-password/confirm",
+    }:
         key = _reset_client_key(request)
         if is_password_reset_blocked(key):
             return JSONResponse(

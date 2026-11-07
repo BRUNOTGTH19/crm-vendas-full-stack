@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Literal
 from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, Field
+
 from models.user import UserRole
 
 
@@ -26,6 +28,20 @@ class PasswordResetRequest(BaseModel):
 
     email: EmailStr
     new_password: str = Field(min_length=6, max_length=128)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Corpo do POST /auth/reset-password/confirm (token gerado pelo admin)."""
+
+    token: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class PasswordResetTokenResponse(BaseModel):
+    """Token em texto devolvido UMA vez ao admin que o gerou."""
+
+    token: str
+    expires_at: datetime
 
 
 class UserResponse(BaseModel):

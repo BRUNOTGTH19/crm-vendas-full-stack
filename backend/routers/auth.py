@@ -1,25 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from database import get_db
 from schemas.user import (
-    UserCreate,
-    UserLogin,
+    PasswordResetConfirmRequest,
     PasswordResetRequest,
-    TokenResponse,
-    UserResponse,
     RefreshRequest,
     RefreshResponse,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
 )
 from services.auth_service import (
-    register_user,
-    login_user,
-    reset_password,
+    confirm_password_reset,
     get_current_user,
+    login_user,
     refresh_tokens,
+    register_user,
+    reset_password,
     revoke_session,
 )
+
+INVALID_RESET_TOKEN_MESSAGE = "Token inválido ou expirado."
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer_scheme = HTTPBearer()
@@ -48,13 +52,34 @@ def reset_password_endpoint(data: PasswordResetRequest, db: Session = Depends(ge
     """Redefinição simples de senha direto na tela de login (sem link ou código).
 
     Basta o e-mail cadastrado + a nova senha. Protegido por rate limit por IP
-    (10 chamadas / 10 minutos). Tokens já emitidos continuam válidos até
-    expirarem; a senha nova passa a valer no próximo login.
+    (10 chamadas / 10 minutos). A troca incrementa ``token_version``: access e
+    refresh tokens emitidos antes dela passam a ser rejeitados.
     """
     try:
         reset_password(db, data.email, data.new_password)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/reset-password/confirm", status_code=status.HTTP_204_NO_CONTENT)
+def confirm_password_reset_endpoint(
+    data: PasswordResetConfirmRequest,
+    db: Session = Depends(get_db),
+):
+    """Confirma a troca com o token de uso único gerado pelo administrador.
+
+    Resposta genérica para token inexistente, usado ou expirado — não revela
+    usuário, e-mail ou validade. O rate limit por IP é o mesmo do endpoint
+    anterior (ver middleware em ``main.py``).
+    """
+    try:
+        confirm_password_reset(db, data.token, data.new_password)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=INVALID_RESET_TOKEN_MESSAGE,
+        ) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
