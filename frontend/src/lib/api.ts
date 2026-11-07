@@ -114,8 +114,16 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/register")) {
+    if (
+      res.status === 401 &&
+      !path.startsWith("/auth/login") &&
+      !path.startsWith("/auth/register") &&
+      !path.startsWith("/auth/reset-password")
+    ) {
       clearSession();
+      if (!window.location.hash.startsWith("#/login")) {
+        window.location.hash = "#/login";
+      }
       window.dispatchEvent(
         new CustomEvent("crm_session_revoked", {
           detail: detailFrom(data, "Sessão expirada ou revogada. Faça login novamente."),
@@ -144,6 +152,14 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export function resetPassword(email: string, newPassword: string): Promise<void> {
   return api.post<void>("/auth/reset-password", {
     email,
+    new_password: newPassword,
+  });
+}
+
+/** Confirma a troca usando o token de uso único entregue pelo administrador. */
+export function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  return api.post<void>("/auth/reset-password/confirm", {
+    token,
     new_password: newPassword,
   });
 }
@@ -404,6 +420,16 @@ export interface AdminUserDeleteResult {
   deleted: boolean;
   user_id: number;
   preserved: string[];
+}
+
+export interface AdminResetTokenResult {
+  token: string;
+  expires_at: string;
+}
+
+/** Gera um token de redefinição de uso único (visível apenas nesta resposta). */
+export function adminCreateResetToken(userId: number): Promise<AdminResetTokenResult> {
+  return api.post<AdminResetTokenResult>(`/admin/users/${userId}/reset-token`);
 }
 
 /** Lista todos os usuários do sistema (somente admin). Nunca inclui hash de senha. */

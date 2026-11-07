@@ -2,13 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { Modal } from "../components/Modal.tsx";
 import {
   ApiError,
+  adminCreateResetToken,
   adminDeleteUser,
   adminExportDatabase,
   adminImportDatabase,
   adminListUsers,
   adminResetDatabase,
+  copyToClipboard,
+  getSessionUser,
   type AdminImportResult,
   type AdminResetResult,
+  type AdminResetTokenResult,
   type AdminUser,
 } from "../lib/api.ts";
 
@@ -28,7 +32,12 @@ export function AdminData() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersBusy, setUsersBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [tokenUser, setTokenUser] = useState<AdminUser | null>(null);
+  const [resetToken, setResetToken] = useState<AdminResetTokenResult | null>(null);
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const me = getSessionUser();
 
   async function doReset() {
     setBusy(true);
@@ -97,6 +106,37 @@ export function AdminData() {
     void loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function closeTokenModal() {
+    if (tokenBusy) return;
+    setTokenUser(null);
+    setResetToken(null);
+    setTokenCopied(false);
+  }
+
+  async function doGenerateResetToken(user: AdminUser) {
+    setTokenUser(user);
+    setResetToken(null);
+    setTokenCopied(false);
+    setTokenBusy(true);
+    setError("");
+    setOk("");
+    try {
+      setResetToken(await adminCreateResetToken(user.id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : String(err));
+      setTokenUser(null);
+    } finally {
+      setTokenBusy(false);
+    }
+  }
+
+  async function copyResetToken() {
+    if (!resetToken) return;
+    await copyToClipboard(resetToken.token);
+    setTokenCopied(true);
+    window.setTimeout(() => setTokenCopied(false), 2000);
+  }
 
   async function doDeleteUser() {
     if (!deleteTarget) return;
@@ -244,18 +284,32 @@ export function AdminData() {
                 </div>
                 <div className="text-xs text-zinc-400">{u.email}</div>
               </div>
-              {u.role === "user" ? (
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(u)}
-                  disabled={busy}
-                  className="rounded-full bg-red-500/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
-                >
-                  Excluir
-                </button>
-              ) : (
-                <span className="text-xs text-zinc-500">protegido</span>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {u.id !== me?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => void doGenerateResetToken(u)}
+                    disabled={tokenBusy}
+                    className="min-h-11 rounded-full bg-[#534AB7] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+                  >
+                    {tokenBusy && tokenUser?.id === u.id
+                      ? "Gerando…"
+                      : "Gerar token de redefinição"}
+                  </button>
+                ) : (
+                  <span className="text-xs text-zinc-500">você</span>
+                )}
+                {u.role === "user" && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(u)}
+                    disabled={busy}
+                    className="min-h-11 rounded-full bg-red-500/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                  >
+                    Excluir
+                  </button>
+                )}
+              </div>
             </li>
           ))}
           {!usersBusy && users.length === 0 && (
@@ -324,6 +378,49 @@ export function AdminData() {
               {busy ? "Zerando…" : "Confirmar e zerar"}
             </button>
           </div>
+        </Modal>
+      )}
+
+      {tokenUser && (
+        <Modal title="Token de redefinição de senha" onClose={closeTokenModal}>
+          <p className="text-sm text-zinc-300">
+            Token para{" "}
+            <span className="font-semibold text-white">{tokenUser.name}</span> (
+            {tokenUser.email}). Entregue o token pessoalmente ao usuário.
+          </p>
+
+          {tokenBusy && (
+            <p className="mt-4 rounded-2xl bg-[#1A1A1A] px-4 py-3 text-sm text-zinc-300">
+              Gerando token…
+            </p>
+          )}
+
+          {resetToken && (
+            <>
+              <div className="mt-4 break-all rounded-2xl border border-[#534AB7]/40 bg-[#1A1A1A] px-4 py-3 font-mono text-xs leading-relaxed text-[#FAC775]">
+                {resetToken.token}
+              </div>
+              <p className="mt-2 text-xs text-[#FAC775]">
+                Expira em 15 minutos e não será exibido novamente. Copie agora.
+              </p>
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeTokenModal}
+                  className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyResetToken()}
+                  className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4]"
+                >
+                  {tokenCopied ? "Copiado ✓" : "Copiar token"}
+                </button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
 

@@ -210,6 +210,10 @@ export function Login({ notice = "" }: { notice?: string }) {
                 Esqueci minha senha
               </button>
               <span className="mx-2 text-zinc-600">•</span>
+              <a href="#/reset-password" className="font-medium text-[#FAC775] hover:underline">
+                Tenho um token
+              </a>
+              <span className="mx-2 text-zinc-600">•</span>
               Ainda não tem conta?{" "}
               <a href="#/register" className="font-medium text-[#FAC775] hover:underline">
                 Cadastre-se

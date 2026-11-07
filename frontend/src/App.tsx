@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout.tsx";
 import { AiChat } from "./components/AiChat.tsx";
 import { Login } from "./pages/Login.tsx";
 import { Register } from "./pages/Register.tsx";
+import { ResetPasswordConfirm } from "./pages/ResetPasswordConfirm.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
 import { Clients } from "./pages/Clients.tsx";
 import { Sales } from "./pages/Sales.tsx";
@@ -91,7 +92,9 @@ export function App(): ReactNode {
   const route = path.split("?")[0];
 
   if (!user) {
-    return route === "/register" ? <Register /> : <Login notice={idleNotice} />;
+    if (route === "/register") return <Register />;
+    if (route === "/reset-password") return <ResetPasswordConfirm />;
+    return <Login notice={idleNotice} />;
   }
 
   const content = new Map<string, ReactNode>([
