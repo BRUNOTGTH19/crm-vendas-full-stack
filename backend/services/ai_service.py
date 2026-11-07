@@ -463,7 +463,12 @@ async def _request_chat_completion(config: AIConfig, payload: dict[str, Any]) ->
     if response.status_code == 429:
         raise AIProviderRateLimitError("Quota do provedor de IA atingida.")
     if response.status_code >= 400:
-        raise AIProviderError(f"Provedor de IA respondeu {_provider_error_detail(response)}.")
+        # ``model`` não é segredo e ajuda a diagnosticar 404 model_not_found.
+        # ``!r`` revela espaços/caracteres invisíveis vindos do ambiente.
+        raise AIProviderError(
+            f"Provedor de IA respondeu {_provider_error_detail(response)} "
+            f"(model={config.model!r})."
+        )
     try:
         data = response.json()
     except ValueError as exc:
