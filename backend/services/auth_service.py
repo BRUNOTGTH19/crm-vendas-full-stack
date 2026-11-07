@@ -1,20 +1,46 @@
+import hashlib
+import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 
-import logging
-
-import redis
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from config import settings
+from models.password_reset_token import PasswordResetToken
 from models.user import User
 from redis_client import redis_client
-from schemas.user import UserCreate, TokenResponse, UserResponse
+from schemas.user import UserCreate
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SESSION_TTL_SECONDS = settings.access_token_expire_minutes * 60  # 8 horas (doc 2.2 / 4.2)
+RESET_TOKEN_TTL_MINUTES = 15
+
+
+def _utcnow() -> datetime:
+    """Relógio único (mockável nos testes de expiração)."""
+    return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Normaliza datas lidas do SQLite (que pode devolver datetime sem tz)."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _token_version(payload: dict) -> int:
+    """Extrai o claim ``tv``; tokens antigos/sem claim são rejeitados."""
+    value = payload.get("tv")
+    if type(value) is not int or value < 0:
+        raise ValueError("Sessão inválida. Faça login novamente.")
+    return value
 
 
 def hash_password(password: str) -> str:
@@ -25,14 +51,22 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, token_version: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    return jwt.encode({**data, "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        {**data, "tv": token_version, "exp": expire},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
 
 
-def create_refresh_token(data: dict) -> str:
+def create_refresh_token(data: dict, token_version: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
-    return jwt.encode({**data, "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        {**data, "tv": token_version, "exp": expire},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +102,15 @@ def revoke_session(user_id: int) -> None:
         pass
 
 
+def delete_session(user_id: int) -> None:
+    """Remove a sessão informativa do Redis na troca de senha (best-effort)."""
+    try:
+        redis_client.delete(_session_key(user_id))
+    except Exception:
+        # A invalidação real é o token_version no banco; Redis é complementar.
+        pass
+
+
 def register_user(db: Session, data: UserCreate) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
@@ -90,14 +133,84 @@ def reset_password(db: Session, email: str, new_password: str) -> None:
 
     Decisão de produto: disponível na tela de login para quem esqueceu a senha.
     O endpoint que chama esta função é protegido por rate limit por IP.
+    Qualquer troca de senha incrementa ``token_version`` e derruba os tokens
+    emitidos antes dela.
     """
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise ValueError("E-mail não cadastrado")
 
     user.password_hash = hash_password(new_password)
+    user.token_version = int(user.token_version or 0) + 1
     db.commit()
-    logging.getLogger(__name__).info("password_reset email=%s user_id=%s", email, user.id)
+    delete_session(user.id)
+    logging.getLogger(__name__).info("password_reset user_id=%s", user.id)
+
+
+def create_password_reset_token(
+    db: Session, admin_id: int, target_user_id: int
+) -> dict[str, object]:
+    """Gera um token de uso único e persiste apenas o hash SHA-256."""
+    if admin_id == target_user_id:
+        raise ValueError("Um administrador não pode gerar token para si mesmo.")
+
+    target = db.get(User, target_user_id)
+    if target is None:
+        raise LookupError("Usuário não encontrado.")
+
+    now = _utcnow()
+    expires_at = now + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+    token = secrets.token_urlsafe(32)
+
+    # Um novo token invalida imediatamente os anteriores ainda pendentes.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == target_user_id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
+
+    db.add(
+        PasswordResetToken(
+            user_id=target_user_id,
+            token_hash=_hash_reset_token(token),
+            expires_at=expires_at,
+        )
+    )
+    db.commit()
+    logging.getLogger(__name__).info(
+        "reset_token_created admin_id=%s target_user_id=%s", admin_id, target_user_id
+    )
+    return {"token": token, "expires_at": expires_at}
+
+
+def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
+    """Troca a senha e invalida sessões na mesma transação.
+
+    Qualquer falha (inexistente, usado ou expirado) resulta na mesma mensagem
+    genérica, sem revelar se o token ou o usuário existem.
+    """
+    row = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == _hash_reset_token(token.strip()))
+        .first()
+    )
+    now = _utcnow()
+    if row is None or row.used_at is not None or _as_utc(row.expires_at) <= now:
+        raise ValueError("Token inválido ou expirado.")
+
+    user = db.get(User, row.user_id)
+    if user is None:
+        raise ValueError("Token inválido ou expirado.")
+
+    user.password_hash = hash_password(new_password)
+    user.token_version = int(user.token_version or 0) + 1
+    # Consome também qualquer outro token pendente do usuário.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
+    db.commit()
+    delete_session(user.id)
+    logging.getLogger(__name__).info("password_reset_confirmed user_id=%s", user.id)
 
 
 def login_user(db: Session, email: str, password: str) -> dict:
@@ -106,8 +219,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
         raise ValueError("Credenciais inválidas")
 
     payload = {"sub": str(user.id), "email": user.email, "role": user.role}
-    access_token = create_access_token(payload)
-    refresh_token = create_refresh_token(payload)
+    access_token = create_access_token(payload, user.token_version)
+    refresh_token = create_refresh_token(payload, user.token_version)
     create_session(user.id, access_token, refresh_token)
 
     return {
@@ -119,20 +232,21 @@ def login_user(db: Session, email: str, password: str) -> dict:
 
 
 def refresh_tokens(db: Session, refresh_token: str) -> dict:
-    """Valida o refresh token (apenas JWT) e emite novos tokens."""
+    """Valida o refresh token (JWT + token_version) e emite novos tokens."""
     try:
         payload = jwt.decode(refresh_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         user_id = int(payload.get("sub"))
+        token_version = _token_version(payload)
     except (JWTError, TypeError, ValueError):
         raise ValueError("Refresh token inválido ou expirado")
 
     user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise ValueError("Usuário não encontrado")
+    if not user or token_version != user.token_version:
+        raise ValueError("Refresh token inválido ou expirado")
 
     new_payload = {"sub": str(user.id), "email": user.email, "role": user.role}
-    access_token = create_access_token(new_payload)
-    new_refresh = create_refresh_token(new_payload)
+    access_token = create_access_token(new_payload, user.token_version)
+    new_refresh = create_refresh_token(new_payload, user.token_version)
     create_session(user.id, access_token, new_refresh)
 
     return {
@@ -146,6 +260,7 @@ def get_current_user(db: Session, token: str) -> User:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         user_id = int(payload.get("sub"))
+        token_version = _token_version(payload)
     except (JWTError, TypeError, ValueError):
         raise ValueError("Token inválido ou expirado")
 
@@ -153,5 +268,8 @@ def get_current_user(db: Session, token: str) -> User:
     if not user:
         raise ValueError("Usuário não encontrado")
 
-    # Autenticação apenas JWT: sem consulta de sessão no Redis.
+    if token_version != user.token_version:
+        raise ValueError("Sessão invalidada. Faça login novamente.")
+
+    # A consulta do usuário já era necessária; o "tv" é comparado na mesma linha.
     return user

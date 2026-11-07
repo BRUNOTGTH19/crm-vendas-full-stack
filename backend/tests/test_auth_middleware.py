@@ -16,7 +16,9 @@ from services.auth_service import create_access_token
 def auth_client(monkeypatch):
     monkeypatch.setattr(settings, "jwt_secret_key", "isolated-test-key-not-for-production")
     db = MagicMock()
-    db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(id=7)
+    db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
+        id=7, token_version=0
+    )
     app = FastAPI()
     app.dependency_overrides[get_db] = lambda: db
 
@@ -33,7 +35,30 @@ def test_missing_authentication(auth_client):
 
 
 def test_valid_authentication(auth_client):
-    token = create_access_token({"sub": "7"})
+    token = create_access_token({"sub": "7"}, token_version=0)
     response = auth_client.get("/protected", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json() == {"id": 7}
+
+
+def test_token_without_tv_is_rejected(auth_client):
+    from datetime import datetime, timedelta, timezone
+
+    from jose import jwt
+
+    token = jwt.encode(
+        {
+            "sub": "7",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        },
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    response = auth_client.get("/protected", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+
+
+def test_token_with_old_version_is_rejected(auth_client):
+    token = create_access_token({"sub": "7"}, token_version=1)
+    response = auth_client.get("/protected", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401

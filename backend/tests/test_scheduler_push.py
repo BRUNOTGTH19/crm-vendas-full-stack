@@ -123,8 +123,12 @@ def test_admin_manual_job_and_audit(sample):
     from services.auth_service import create_access_token
 
     client = TestClient(app)
-    admin = {"Authorization": f"Bearer {create_access_token({'sub': '1'})}"}
-    user = {"Authorization": f"Bearer {create_access_token({'sub': '2'})}"}
+    admin = {
+        "Authorization": f"Bearer {create_access_token({'sub': '1'}, token_version=0)}"
+    }
+    user = {
+        "Authorization": f"Bearer {create_access_token({'sub': '2'}, token_version=0)}"
+    }
     assert client.post("/admin/reminders/run", json={}).status_code == 401
     assert client.post("/admin/reminders/run", json={}, headers=user).status_code == 403
     assert client.post("/admin/reminders/run", json={"dry_run": False}, headers=admin).status_code == 400

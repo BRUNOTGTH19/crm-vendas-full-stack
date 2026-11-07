@@ -41,7 +41,7 @@ def _configure_ai(monkeypatch) -> None:
 
 
 def _auth(user_id: int) -> dict[str, str]:
-    token = create_access_token({"sub": str(user_id)})
+    token = create_access_token({"sub": str(user_id)}, token_version=0)
     return {"Authorization": f"Bearer {token}"}
 
 

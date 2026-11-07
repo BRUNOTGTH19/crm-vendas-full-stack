@@ -11,6 +11,7 @@ from models.sale_item import SaleItem
 from models.payment import Payment
 from models.push_subscription import PushSubscription
 from models.app_setting import AppSetting
+from models.password_reset_token import PasswordResetToken
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
