@@ -107,14 +107,14 @@ export function PaymentModal({ sale, busy, onConfirm, onClose }: PaymentModalPro
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={busy}
-            className="rounded-full bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="min-h-11 rounded-full bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             {busy ? "Processando…" : "Confirmar pagamento"}
           </button>

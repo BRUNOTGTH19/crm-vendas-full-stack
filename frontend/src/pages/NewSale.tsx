@@ -149,7 +149,10 @@ function NewSalePage(props: {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Nova venda</h1>
-        <a href="#/sales" className="text-sm text-[#FAC775] hover:underline">
+        <a
+          href="#/sales"
+          className="inline-flex min-h-11 items-center px-1 text-sm text-[#FAC775] hover:underline"
+        >
           ← Voltar para vendas
         </a>
       </div>
@@ -161,7 +164,7 @@ function NewSalePage(props: {
           </p>
           <a
             href="#/sales"
-            className="mt-4 inline-block rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
+            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
           >
             Ver vendas
           </a>
@@ -233,7 +236,7 @@ function NewSalePage(props: {
                     type="button"
                     onClick={() => onRemoveItem(it.key)}
                     disabled={items.length === 1}
-                    className="text-lg leading-none text-red-400 hover:text-red-300 disabled:opacity-40"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-lg leading-none text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
                     aria-label="Remover linha"
                   >
                     ×
@@ -334,7 +337,7 @@ function NewSalePage(props: {
                         type="button"
                         onClick={() => onRemoveItem(it.key)}
                         disabled={items.length === 1}
-                        className="text-lg leading-none text-red-400 hover:text-red-300 disabled:opacity-40"
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-lg leading-none text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
                         aria-label="Remover linha"
                       >
                         ×
@@ -350,7 +353,7 @@ function NewSalePage(props: {
             <button
               type="button"
               onClick={onAddItem}
-              className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5"
+              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5"
             >
               + Adicionar produto
             </button>
@@ -369,14 +372,14 @@ function NewSalePage(props: {
           <div className="flex justify-end gap-3">
             <a
               href="#/sales"
-              className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
+              className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
             >
               Cancelar
             </a>
             <button
               type="submit"
               disabled={busy}
-              className="rounded-full bg-[#534AB7] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#534AB7] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
             >
               {busy ? "Salvando…" : "Registrar venda"}
             </button>

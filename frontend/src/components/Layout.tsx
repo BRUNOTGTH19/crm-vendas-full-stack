@@ -71,7 +71,7 @@ function PushToggle() {
       <button
         onClick={toggle}
         disabled={state === "loading" || state === "denied"}
-        className="flex items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
+        className="flex min-h-11 items-center gap-2 rounded px-2 py-1 text-xs text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
         title="Ativar/Desativar Notificações"
       >
         <span>{label}</span>
@@ -134,37 +134,41 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Bottom bar mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around overflow-x-auto border-t border-white/10 bg-[#26215C]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      {/* Bottom bar mobile: 7 itens (6 rotas + Sair) dividindo a largura com
+          `flex-1 min-w-0`. Antes o padding fixo (px-2 por item) somava 342px de
+          conteúdo e gerava rolagem interna em telas de 320px; agora cada item
+          encolhe até ~46px, o rótulo usa `truncate` e o ícone diminui um passo
+          abaixo de 360px. `min-h-11` mantém o alvo de toque de 44px. */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-white/10 bg-[#26215C]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {BOTTOM_NAV.map((n) => (
           <a
             key={n.href}
             href={n.href}
-            className={`flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] ${
+            className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[9px] min-[360px]:text-[10px] ${
               isActive(n.href) ? "font-semibold text-[#FAC775]" : "text-zinc-300"
             }`}
           >
-            <span className="text-lg" aria-hidden>
+            <span className="text-base min-[360px]:text-lg" aria-hidden>
               {n.icon}
             </span>
-            {n.label}
+            <span className="w-full truncate text-center leading-tight">{n.label}</span>
           </a>
         ))}
         {/* Sair (logout local) */}
         <button
           type="button"
           onClick={onLogout}
-          className="flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] text-zinc-300"
+          className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[9px] text-zinc-300 min-[360px]:text-[10px]"
         >
-          <span className="text-lg" aria-hidden>
+          <span className="text-base min-[360px]:text-lg" aria-hidden>
             {"\u{1F6AA}"}
           </span>
-          Sair
+          <span className="w-full truncate text-center leading-tight">Sair</span>
         </button>
       </nav>
 
       {/* Identificação do usuário logado: fixa no topo, presente em todas as rotas */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#26215C]/95 backdrop-blur lg:ml-64">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#26215C]/95 pt-[env(safe-area-inset-top)] backdrop-blur lg:ml-64">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <span className="text-lg font-bold text-white lg:hidden">CRM Vendas</span>
@@ -183,7 +187,10 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           </div>
           <div className="flex items-center gap-3">
             {user.role === "admin" && (
-              <a href={ADMIN_NAV.href} className="text-sm text-[#FAC775] lg:hidden">
+              <a
+                href={ADMIN_NAV.href}
+                className="inline-flex min-h-11 items-center px-1 text-sm text-[#FAC775] lg:hidden"
+              >
                 Dados (admin)
               </a>
             )}
@@ -192,7 +199,9 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
         </div>
       </header>
 
-      <main className="px-4 pb-24 pt-6 md:px-8 lg:ml-64 lg:pb-8 lg:pt-8">{children}</main>
+      {/* pb reserva a altura da bottom bar (~56px) + safe area do iPhone, para o
+          último item da lista nunca ficar escondido atrás da navegação. */}
+      <main className="px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 md:px-8 lg:ml-64 lg:pb-8 lg:pt-8">{children}</main>
     </div>
   );
 }

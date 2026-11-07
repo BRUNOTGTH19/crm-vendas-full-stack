@@ -23,7 +23,7 @@ export function PDFButton({ onDownload, label = "PDF", disabled }: PDFButtonProp
           setBusy(false);
         }
       }}
-      className="rounded-full bg-[#534AB7] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+      className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#534AB7] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
     >
       {busy ? "Gerando…" : label}
     </button>

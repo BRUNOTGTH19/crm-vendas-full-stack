@@ -71,7 +71,7 @@ export function Dashboard() {
         <button
           onClick={load}
           disabled={busy}
-          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+          className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
         >
           {busy ? "Carregando…" : "Atualizar"}
         </button>
@@ -105,28 +105,32 @@ export function Dashboard() {
               {data.recent_sales.length === 0 ? (
                 <p className="text-sm text-zinc-400">Nenhuma venda registrada ainda.</p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase text-zinc-400">
-                      <th className="pb-2">Cliente</th>
-                      <th className="pb-2">Data</th>
-                      <th className="pb-2">Total</th>
-                      <th className="pb-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.recent_sales.map((s) => (
-                      <tr key={s.id} className="border-t border-white/5">
-                        <td className="py-2.5 text-zinc-100">{s.client_name}</td>
-                        <td className="py-2.5 text-zinc-400">{fmtDate(s.sale_date)}</td>
-                        <td className="py-2.5 font-semibold text-white">{fmtMoney(s.total)}</td>
-                        <td className="py-2.5">
-                          <StatusBadge status={s.status} />
-                        </td>
+                // Tabela com rolagem horizontal: em telas estreitas as 4 colunas
+                // não cabem e a página inteira não deve rolar de lado.
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase text-zinc-400">
+                        <th className="pb-2">Cliente</th>
+                        <th className="pb-2">Data</th>
+                        <th className="pb-2">Total</th>
+                        <th className="pb-2">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.recent_sales.map((s) => (
+                        <tr key={s.id} className="border-t border-white/5">
+                          <td className="py-2.5 text-zinc-100">{s.client_name}</td>
+                          <td className="py-2.5 text-zinc-400">{fmtDate(s.sale_date)}</td>
+                          <td className="py-2.5 font-semibold text-white">{fmtMoney(s.total)}</td>
+                          <td className="py-2.5">
+                            <StatusBadge status={s.status} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 

@@ -145,7 +145,7 @@ function SalesPage(props: {
         <h1 className="text-2xl font-bold text-white">Vendas</h1>
         <a
           href="#/sales/new"
-          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
+          className="inline-flex min-h-11 items-center rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
         >
           + Nova venda
         </a>
@@ -179,7 +179,7 @@ function SalesPage(props: {
           type="button"
           onClick={onReload}
           disabled={busy}
-          className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+          className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
         >
           {busy ? "Carregando…" : "Atualizar"}
         </button>
@@ -226,7 +226,7 @@ function SalesPage(props: {
                     <button
                       type="button"
                       onClick={() => onView(s)}
-                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/5"
+                      className="min-h-11 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/5"
                     >
                       Ver
                     </button>
@@ -235,7 +235,7 @@ function SalesPage(props: {
                         type="button"
                         onClick={() => onPay(s)}
                         disabled={busy}
-                        className="ml-1.5 rounded-full border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                        className="ml-1.5 min-h-11 rounded-full border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
                       >
                         Pagar
                       </button>
@@ -244,7 +244,7 @@ function SalesPage(props: {
                       type="button"
                       onClick={() => onPdf(s.id)}
                       disabled={busy}
-                      className="ml-1.5 rounded-full border border-[#534AB7] px-3 py-1.5 text-xs font-medium text-[#B9B2F5] hover:bg-[#534AB7]/20 disabled:opacity-50"
+                      className="ml-1.5 min-h-11 rounded-full border border-[#534AB7] px-3 py-1.5 text-xs font-medium text-[#B9B2F5] hover:bg-[#534AB7]/20 disabled:opacity-50"
                     >
                       PDF
                     </button>
@@ -268,36 +268,39 @@ function SalesPage(props: {
             <dt className="text-zinc-400">Vencimento</dt>
             <dd className="text-white">{fmtDate(viewing.due_date)}</dd>
           </dl>
-          <table className="mt-4 w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
-                <th className="px-3 py-2">Produto</th>
-                <th className="px-3 py-2 text-right">Qtd.</th>
-                <th className="px-3 py-2 text-right">P. unit.</th>
-                <th className="px-3 py-2 text-right">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {viewing.items.map((it) => (
-                <tr key={it.id} className="border-t border-white/5">
-                  <td className="px-3 py-2 text-zinc-200">{it.product_name}</td>
-                  <td className="px-3 py-2 text-right text-zinc-400">{it.quantity}</td>
-                  <td className="px-3 py-2 text-right text-zinc-400">{fmtMoney(it.unit_price)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-[#FAC775]">{fmtMoney(it.subtotal)}</td>
+          {/* Tabela de itens com rolagem horizontal própria dentro do modal. */}
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                  <th className="px-3 py-2">Produto</th>
+                  <th className="px-3 py-2 text-right">Qtd.</th>
+                  <th className="px-3 py-2 text-right">P. unit.</th>
+                  <th className="px-3 py-2 text-right">Subtotal</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-white/10">
-                <td colSpan={3} className="px-3 py-2.5 text-right font-semibold text-zinc-300">
-                  Total
-                </td>
-                <td className="px-3 py-2.5 text-right text-base font-bold text-white">
-                  {fmtMoney(viewing.total)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+              <tbody>
+                {viewing.items.map((it) => (
+                  <tr key={it.id} className="border-t border-white/5">
+                    <td className="px-3 py-2 text-zinc-200">{it.product_name}</td>
+                    <td className="px-3 py-2 text-right text-zinc-400">{it.quantity}</td>
+                    <td className="px-3 py-2 text-right text-zinc-400">{fmtMoney(it.unit_price)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-[#FAC775]">{fmtMoney(it.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-white/10">
+                  <td colSpan={3} className="px-3 py-2.5 text-right font-semibold text-zinc-300">
+                    Total
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-base font-bold text-white">
+                    {fmtMoney(viewing.total)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </Modal>
       )}
     </div>

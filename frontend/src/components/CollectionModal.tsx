@@ -157,7 +157,7 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
           type="button"
           onClick={copy}
           disabled={loading}
-          className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+          className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
         >
           {copied ? "Copiado ✓" : "Copiar"}
         </button>
@@ -165,7 +165,7 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
           type="button"
           onClick={downloadPdf}
           disabled={pdfState === "working"}
-          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+          className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
         >
           {pdfState === "working" ? "Gerando…" : pdfState === "done" ? "Baixar novamente" : "Baixar PDF"}
         </button>
@@ -174,7 +174,7 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
           onClick={openWhatsapp}
           disabled={!hasPhone || loading}
           title={hasPhone ? "Abrir WhatsApp com a mensagem pronta" : "Cliente sem WhatsApp"}
-          className="rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+          className="min-h-11 rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
         >
           Abrir WhatsApp
         </button>

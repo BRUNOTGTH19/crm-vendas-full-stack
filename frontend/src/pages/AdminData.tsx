@@ -187,7 +187,7 @@ export function AdminData() {
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={busy}
-            className="mt-4 w-full rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+            className="min-h-11 mt-4 w-full rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
           >
             Zerar dados
           </button>
@@ -203,7 +203,7 @@ export function AdminData() {
             type="button"
             onClick={doExport}
             disabled={busy}
-            className="mt-4 w-full rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+            className="min-h-11 mt-4 w-full rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
           >
             Exportar dados
           </button>
@@ -219,14 +219,14 @@ export function AdminData() {
             ref={fileRef}
             type="file"
             accept="application/json,.json"
-            className="mt-3 w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-xs text-zinc-300 file:mr-3 file:rounded-full file:border-0 file:bg-[#534AB7] file:px-3 file:py-1.5 file:text-xs file:text-white"
+            className="mt-3 min-h-11 w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-xs text-zinc-300 file:mr-3 file:rounded-full file:border-0 file:bg-[#534AB7] file:px-3 file:py-1.5 file:text-xs file:text-white"
           />
           <label className="mt-3 flex items-center gap-2 text-xs text-zinc-300">
             <span>Conflitos de ID:</span>
             <select
               value={importMode}
               onChange={(e) => setImportMode(e.target.value as "skip" | "overwrite")}
-              className="rounded-lg border border-white/10 bg-[#1A1A1A] px-2 py-1 text-xs text-white focus:border-[#534AB7] focus:outline-none"
+              className="min-h-11 rounded-lg border border-white/10 bg-[#1A1A1A] px-2 py-1 text-xs text-white focus:border-[#534AB7] focus:outline-none"
             >
               <option value="skip">Pular existentes (skip)</option>
               <option value="overwrite">Sobrescrever (overwrite)</option>
@@ -236,7 +236,7 @@ export function AdminData() {
             type="button"
             onClick={doImport}
             disabled={busy}
-            className="mt-3 w-full rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="min-h-11 mt-3 w-full rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             Importar dados
           </button>
@@ -258,7 +258,7 @@ export function AdminData() {
             type="button"
             onClick={() => void loadUsers()}
             disabled={usersBusy}
-            className="rounded-full border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
           >
             {usersBusy ? "Carregando…" : "Atualizar lista"}
           </button>
@@ -365,7 +365,7 @@ export function AdminData() {
               type="button"
               onClick={() => setConfirmOpen(false)}
               disabled={busy}
-              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -373,7 +373,7 @@ export function AdminData() {
               type="button"
               onClick={doReset}
               disabled={busy}
-              className="rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              className="min-h-11 rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
             >
               {busy ? "Zerando…" : "Confirmar e zerar"}
             </button>
@@ -443,7 +443,7 @@ export function AdminData() {
               type="button"
               onClick={() => setDeleteTarget(null)}
               disabled={busy}
-              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -451,7 +451,7 @@ export function AdminData() {
               type="button"
               onClick={doDeleteUser}
               disabled={busy}
-              className="rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              className="min-h-11 rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
             >
               {busy ? "Excluindo…" : "Confirmar exclusão"}
             </button>

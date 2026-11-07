@@ -9,7 +9,7 @@ interface ModalProps {
 export function Modal({ title, onClose, children }: ModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
       onClick={onClose}
     >
       <div
@@ -20,7 +20,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
           <h2 className="text-lg font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 text-2xl leading-none"
+            className="-my-2 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl leading-none text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
             aria-label="Fechar"
           >
             ×

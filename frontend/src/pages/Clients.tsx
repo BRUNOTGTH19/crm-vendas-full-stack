@@ -152,7 +152,7 @@ function PageBody(props: {
   } = props;
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-5xl">
       <h1 className="mb-6 text-2xl font-bold text-white">Clientes</h1>
 
       <form
@@ -179,13 +179,13 @@ function PageBody(props: {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4] disabled:opacity-50"
+          className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4] disabled:opacity-50"
         >
           Adicionar
         </button>
       </form>
 
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <input
           type="search"
           value={search}
@@ -197,20 +197,20 @@ function PageBody(props: {
             }
           }}
           placeholder="Buscar por nome (sem acentos)…"
-          className="flex-1 rounded-full border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+          className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
         />
         <button
           type="button"
           onClick={() => onSearch(search.trim())}
           disabled={busy}
-          className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5"
+          className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5"
         >
           Buscar
         </button>
         <button
           type="button"
           onClick={onClear}
-          className="rounded-full border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"
+          className="min-h-11 rounded-full border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"
         >
           Limpar
         </button>
@@ -229,57 +229,105 @@ function PageBody(props: {
           Nenhum cliente{search.trim() ? " que corresponda à busca" : ""}.
         </p>
       ) : (
-        <table className="mt-3 w-full overflow-hidden rounded-3xl bg-[#26215C] text-sm shadow-lg shadow-black/30">
-          <thead>
-            <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Normalizado</th>
-              <th className="px-4 py-3">Cadastro</th>
-              <th className="px-4 py-3 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((c) => (
-              <tr key={c.id} className="border-t border-white/5 hover:bg-white/5">
-                <td className="px-4 py-2.5 font-medium text-white">
-                  <span className="inline-flex items-center gap-2">
-                    {c.full_name}
-                    {c.whatsapp && (
-                      <a
-                        href={`https://wa.me/${c.whatsapp}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Abrir WhatsApp: ${c.whatsapp}`}
-                        aria-label={`Abrir WhatsApp de ${c.full_name}`}
-                        className="inline-flex text-emerald-400 hover:text-emerald-300"
-                      >
-                        <WhatsappIcon />
-                      </a>
-                    )}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-zinc-400">{c.name_normalized}</td>
-                <td className="px-4 py-2.5 text-zinc-400">{fmtDate(c.created_at)}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(c)}
-                    className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-[#FAC775] hover:bg-white/5"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(c)}
-                    className="ml-2 rounded-full border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/10"
-                  >
-                    Excluir
-                  </button>
-                </td>
+        // Rolagem horizontal: 4 colunas + botões não cabem em telas estreitas.
+        <div className="mt-3 hidden overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30 sm:block">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                <th className="px-4 py-3">Nome</th>
+                <th className="hidden px-4 py-3 xl:table-cell">Normalizado</th>
+                <th className="px-4 py-3">Cadastro</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {clients.map((c) => (
+                <tr key={c.id} className="border-t border-white/5 hover:bg-white/5">
+                  <td className="px-4 py-2.5 font-medium text-white">
+                    <span className="inline-flex items-center gap-2">
+                      {c.full_name}
+                      {c.whatsapp && (
+                        <a
+                          href={`https://wa.me/${c.whatsapp}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Abrir WhatsApp: ${c.whatsapp}`}
+                          aria-label={`Abrir WhatsApp de ${c.full_name}`}
+                          className="relative inline-flex text-emerald-400 after:absolute after:-inset-3.5 after:content-[''] hover:text-emerald-300"
+                        >
+                          <WhatsappIcon />
+                        </a>
+                      )}
+                    </span>
+                  </td>
+                  <td className="hidden px-4 py-2.5 text-zinc-400 xl:table-cell">{c.name_normalized}</td>
+                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(c.created_at)}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(c)}
+                      className="min-h-11 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-[#FAC775] hover:bg-white/5"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(c)}
+                      className="ml-2 min-h-11 rounded-full border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/10"
+                    >
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Mobile: cartões — a tabela de 4 colunas + botões não caberia em 360px. */}
+      {!busy && clients.length > 0 && (
+        <ul className="mt-3 space-y-2 sm:hidden">
+          {clients.map((c) => (
+            <li key={c.id} className="rounded-2xl bg-[#26215C] p-4 shadow-lg shadow-black/30">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                  {c.full_name}
+                </span>
+                {c.whatsapp && (
+                  <a
+                    href={`https://wa.me/${c.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Abrir WhatsApp: ${c.whatsapp}`}
+                    aria-label={`Abrir WhatsApp de ${c.full_name}`}
+                    className="relative inline-flex shrink-0 text-emerald-400 after:absolute after:-inset-3.5 after:content-[''] hover:text-emerald-300"
+                  >
+                    <WhatsappIcon />
+                  </a>
+                )}
+              </div>
+              <div className="truncate text-xs text-zinc-400">{c.name_normalized}</div>
+              <div className="text-xs text-zinc-500">Cadastro: {fmtDate(c.created_at)}</div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(c)}
+                  className="min-h-11 flex-1 rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-[#FAC775] hover:bg-white/5"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(c)}
+                  className="min-h-11 flex-1 rounded-full border border-red-500/40 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/10"
+                >
+                  Excluir
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       {editing && (
@@ -308,7 +356,7 @@ function PageBody(props: {
             <button
               type="button"
               onClick={() => setEditing(null)}
-              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5"
+              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5"
             >
               Cancelar
             </button>
@@ -316,7 +364,7 @@ function PageBody(props: {
               type="button"
               onClick={saveEdit}
               disabled={busy}
-              className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
+              className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
             >
               Salvar
             </button>

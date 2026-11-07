@@ -16,3 +16,43 @@ body {
   background-color: #1a1a1a;
   color: #f3f2f7;
 }
+
+/* ---------------------------------------------------------------------------
+   Ajustes para uso no celular (PWA)
+   ---------------------------------------------------------------------------
+   Este bloco fica FORA de @layer, por isso tem prioridade sobre as utilities
+   do Tailwind v4 (que vivem em @layer utilities) — sem precisar !important. */
+
+/* Safari/iOS aplica zoom automático ao focar campos com fonte menor que 16px.
+   Os formulários usam `text-sm` (14px) no desktop e passam a 16px até 640px
+   (mesma fronteira do breakpoint `sm`, como já é feito em Reports.tsx). */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 100vh considera a barra de endereço do navegador mobile, empurrando o
+   conteúdo e criando rolagem extra. dvh usa a altura realmente visível; em
+   navegadores antigos a declaração é ignorada e o 100vh continua valendo. */
+@supports (min-height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}
+
+/* Toque em controles: no celular o toque espera ~300 ms pelo duplo toque (zoom)
+   antes de disparar o clique, e o próprio duplo toque aplica zoom na página.
+   `touch-action: manipulation` remove os dois atrasos sem bloquear o zoom por
+   pinça, que é requisito de acessibilidade. */
+button,
+[role="button"],
+a,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}

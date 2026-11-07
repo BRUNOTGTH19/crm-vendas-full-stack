@@ -52,7 +52,7 @@ export function History() {
             setClientId(e.target.value);
             load(e.target.value);
           }}
-          className="min-w-56 rounded-full border border-white/10 bg-[#26215C] px-4 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+          className="min-h-11 min-w-56 max-w-full rounded-full border border-white/10 bg-[#26215C] px-4 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
         >
           <option value="">Selecione um cliente…</option>
           {clients.map((c) => (

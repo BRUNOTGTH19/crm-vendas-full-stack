@@ -65,7 +65,7 @@ export function Login({ notice = "" }: { notice?: string }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-6">
+    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md rounded-3xl bg-[#26215C] p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#534AB7] text-2xl font-bold text-[#FAC775]">
@@ -100,7 +100,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
               placeholder="voce@crm.com"
             />
           </div>
@@ -112,7 +112,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
               placeholder="••••••••"
             />
           </div>
@@ -126,7 +126,7 @@ export function Login({ notice = "" }: { notice?: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+            className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
           >
             {busy ? "Entrando…" : "Entrar"}
           </button>
@@ -141,7 +141,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               autoComplete="email"
               value={resetEmail}
               onChange={(e) => setResetEmail(e.target.value)}
-              className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
               placeholder="voce@crm.com"
             />
           </div>
@@ -154,7 +154,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
               placeholder="mínimo 6 caracteres"
             />
           </div>
@@ -167,7 +167,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
               placeholder="repita a nova senha"
             />
           </div>
@@ -181,7 +181,7 @@ export function Login({ notice = "" }: { notice?: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+            className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
           >
             {busy ? "Redefinindo…" : "Redefinir senha"}
           </button>
@@ -192,7 +192,7 @@ export function Login({ notice = "" }: { notice?: string }) {
               setMode("login");
               setError("");
             }}
-            className="w-full rounded-full border border-white/10 py-2.5 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="min-h-11 w-full rounded-full border border-white/10 py-2.5 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
           >
             Voltar para o login
           </button>

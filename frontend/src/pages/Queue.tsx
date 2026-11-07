@@ -160,7 +160,7 @@ export function Queue() {
                     type="button"
                     onClick={() => setCollecting(s)}
                     disabled={busy}
-                    className="rounded-full bg-[#FAC775]/90 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] hover:bg-[#FAC775] disabled:opacity-50"
+                    className="min-h-11 rounded-full bg-[#FAC775]/90 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] hover:bg-[#FAC775] disabled:opacity-50"
                   >
                     Cobrar
                   </button>
@@ -168,7 +168,7 @@ export function Queue() {
                     type="button"
                     onClick={() => receive(s)}
                     disabled={busy}
-                    className="rounded-full bg-emerald-500/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                    className="min-h-11 rounded-full bg-emerald-500/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
                     Receber
                   </button>

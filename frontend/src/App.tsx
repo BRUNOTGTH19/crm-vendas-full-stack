@@ -41,7 +41,7 @@ function IdleWarning({ seconds, onKeepAlive }: { seconds: number; onKeepAlive: (
         <button
           type="button"
           onClick={onKeepAlive}
-          className="mt-5 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4]"
+          className="mt-5 min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4]"
         >
           Continuar logado
         </button>
