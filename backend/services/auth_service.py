@@ -365,6 +365,42 @@ def create_password_reset_token(
     return {"token": token, "expires_at": expires_at}
 
 
+def request_password_reset(db: Session, email: str) -> str | None:
+    """Cria um token de recuperação para o e-mail, sem revelar se ele existe.
+
+    Devolve o token em texto (para o e-mail) ou ``None`` quando a conta não
+    existe. Um novo pedido invalida os tokens pendentes anteriores.
+    """
+    normalized = (email or "").strip().lower()
+    user = db.query(User).filter(User.email == normalized).first()
+    if user is None:
+        return None
+
+    now = _utcnow()
+    token = secrets.token_urlsafe(32)
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_reset_token(token),
+            expires_at=now + timedelta(minutes=RESET_TOKEN_TTL_MINUTES),
+        )
+    )
+    db.add(
+        AuditLog(
+            user_id=user.id,
+            action="password_reset_requested",
+            detail="self-service",
+        )
+    )
+    db.commit()
+    logging.getLogger(__name__).info("password_reset_requested user_id=%s", user.id)
+    return token
+
+
 def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
     """Troca a senha e invalida sessões na mesma transação.
 

@@ -66,6 +66,20 @@ class Settings(BaseSettings):
     # do servidor (Render/terminal). O código gerado é de uso único.
     admin_setup_code: str = ""
 
+    # --- Recuperação de senha por e-mail (self-service) ---
+    # Com SMTP configurado, o usuário pede o link em "Esqueci minha senha" e
+    # recebe um token de uso único. Sem SMTP, o endpoint continua respondendo de
+    # forma genérica, mas quem redefine é o administrador (token no painel ou
+    # ``manage.py set-password`` no servidor).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    # URL pública do frontend usada no link do e-mail (ex.: https://app.vercel.app).
+    app_public_url: str = ""
+
     # --- Web Push (notificações de alerta de prazo de vendas) ---
     # Gere o par de chaves com: python gen_vapid_keys.py
     # A pública vai para o frontend (applicationServerKey); a privada fica aqui.

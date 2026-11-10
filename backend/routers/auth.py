@@ -10,11 +10,14 @@ from database import get_db
 from middleware.client_ip import client_ip
 from middleware.rate_limit import (
     is_admin_activation_blocked,
+    is_password_reset_blocked,
     record_admin_activation_failure,
+    record_password_reset,
 )
 from models.audit_log import AuditLog
 from schemas.user import (
     AdminActivationRequest,
+    ForgotPasswordRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
     RefreshRequest,
@@ -24,7 +27,9 @@ from schemas.user import (
     UserLogin,
     UserResponse,
 )
+from services import mail_service
 from services.auth_service import (
+    RESET_TOKEN_TTL_MINUTES,
     activate_admin,
     confirm_password_reset,
     create_session,
@@ -32,6 +37,7 @@ from services.auth_service import (
     login_user,
     refresh_tokens,
     register_user,
+    request_password_reset,
     reset_password,
     revoke_session,
 )
@@ -39,6 +45,10 @@ from services.auth_service import (
 INVALID_RESET_TOKEN_MESSAGE = "Token inválido ou expirado."
 LEGACY_RESET_DISABLED_MESSAGE = (
     "A redefinição por e-mail está desativada. Peça um token ao administrador."
+)
+# Resposta sempre igual: não confirma se o e-mail existe (enumeração de contas).
+FORGOT_PASSWORD_MESSAGE = (
+    "Se o e-mail estiver cadastrado, você receberá as instruções em instantes."
 )
 logger = logging.getLogger(__name__)
 
@@ -121,6 +131,52 @@ def confirm_password_reset_endpoint(
             detail=INVALID_RESET_TOKEN_MESSAGE,
         ) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/password-reset/config")
+def password_reset_config():
+    """Informa se a recuperação por e-mail está disponível.
+
+    Expõe apenas a configuração do servidor (nunca se um e-mail existe), para a
+    tela escolher entre o formulário e as instruções com o administrador.
+    """
+    return {"self_service": mail_service.is_email_configured()}
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def forgot_password_endpoint(
+    data: ForgotPasswordRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Envia por e-mail um token de uso único para redefinir a senha.
+
+    A resposta é sempre a mesma, com ou sem conta cadastrada, e o envio ocorre
+    em segundo plano para não revelar o tempo de resposta (enumeração de
+    contas). Sem SMTP configurado nada é enviado; o caminho continua sendo o
+    token gerado pelo administrador.
+    """
+    ip = client_ip(request)
+    if is_password_reset_blocked(ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas. Tente novamente em alguns minutos.",
+        )
+    record_password_reset(ip)
+
+    token = None
+    if mail_service.is_email_configured():
+        token = request_password_reset(db, str(data.email))
+    if token:
+        background_tasks.add_task(
+            mail_service.send_password_reset_email,
+            str(data.email).strip().lower(),
+            token,
+            RESET_TOKEN_TTL_MINUTES,
+        )
+
+    return {"message": FORGOT_PASSWORD_MESSAGE}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

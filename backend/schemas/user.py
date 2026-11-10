@@ -30,13 +30,19 @@ class PasswordResetRequest(BaseModel):
     """Corpo do POST /auth/reset-password (redefinição simples, sem link/código).
 
     Disponibilizado na tela de login para quem esqueceu a senha. ATENÇÃO: por
-    decisão de produto, basta o e-mail cadastrado — qualquer pessoa que saiba
+    decisão de produto, basta o e-mail cadastrado - qualquer pessoa que saiba
     o e-mail pode trocar a senha. O endpoint é protegido por rate limit por IP
     e vem **desligado** por padrão (``ALLOW_LEGACY_PASSWORD_RESET``).
     """
 
     email: EmailStr
     new_password: str = Field(min_length=8, max_length=72)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Corpo do POST /auth/forgot-password (link por e-mail, sem trocar a senha)."""
+
+    email: EmailStr
 
 
 class PasswordResetConfirmRequest(BaseModel):
