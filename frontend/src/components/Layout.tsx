@@ -4,6 +4,7 @@ import { activateAdmin, ApiError, updateSessionUser } from "../lib/api.ts";
 import { getPushState, enablePush, disablePush } from "../lib/push.ts";
 import { initialsOf, roleLabel } from "../lib/user-label.ts";
 import { Modal } from "./Modal.tsx";
+import { PasswordInput } from "./PasswordInput.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import {
   IconBell,
@@ -345,10 +346,12 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
               vez que o app é aberto sem administrador, ou pode ser definido na
               variável <strong className="font-bold">ADMIN_SETUP_CODE</strong>.
             </p>
-            <label className="block">
-              <span className="label">Código de ativação</span>
-              <input
-                type="password"
+            <div>
+              <label className="label" htmlFor="activate-code">
+                Código de ativação
+              </label>
+              <PasswordInput
+                id="activate-code"
                 className="field"
                 value={activateCode}
                 onChange={(event) => setActivateCode(event.target.value)}
@@ -358,7 +361,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
                 disabled={activateBusy}
                 placeholder="Cole aqui o código"
               />
-            </label>
+            </div>
             {activateError && (
               <p role="alert" className="error-text">
                 {activateError}
