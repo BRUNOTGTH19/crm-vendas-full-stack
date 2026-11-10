@@ -95,15 +95,32 @@ def test_generated_code_promotes_once_and_is_logged(caplog):
     assert client.get("/admin/users", headers=other).status_code == 403
 
 
-def test_env_code_activates_only_once(monkeypatch):
+def test_env_code_works_even_with_existing_admin(monkeypatch):
+    """A chave mestra do operador funciona mesmo se já existe um admin.
+
+    Antes, a checagem de "já existe admin" vinha antes da validação do código,
+    o que travava a recuperação de acesso. Agora a variável é soberana.
+    """
     monkeypatch.setattr(settings, "admin_setup_code", "codigo-do-dono")
     stamp = _stamp()
     owner_email = f"env_dono_{stamp}@crm.com"
     other_email = f"env_outro_{stamp}@crm.com"
     _register("Dono Env", owner_email)
     _register("Outro Env", other_email)
-    owner = _login(owner_email)
 
+    # Admin pré-existente (de um uso anterior) não bloqueia a chave mestra.
+    with SessionLocal() as db:
+        db.add(
+            User(
+                name="Admin Anterior",
+                email=f"anterior_{stamp}@crm.com",
+                password_hash="x",
+                role="admin",
+            )
+        )
+        db.commit()
+
+    owner = _login(owner_email)
     # Com a variável definida, nenhum código aleatório é gerado.
     with SessionLocal() as db:
         assert db.query(AppSetting).filter(AppSetting.key == CODE_KEY).count() == 0
@@ -112,10 +129,11 @@ def test_env_code_activates_only_once(monkeypatch):
     r = _activate(owner, "codigo-do-dono")
     assert r.status_code == 200, r.text
     assert r.json()["role"] == "admin"
+    assert client.get("/admin/users", headers=owner).status_code == 200
 
-    # Encerrada a ativação, nem o código do operador promove mais ninguém.
+    # Sem saber a chave, ninguém mais entra.
     other = _login(other_email)
-    assert _activate(other, "codigo-do-dono").status_code == 400
+    assert _activate(other, "outra-tentativa").status_code == 400
     assert client.get("/admin/users", headers=other).status_code == 403
 
 

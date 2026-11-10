@@ -175,25 +175,32 @@ def ensure_admin_setup_code(db: Session) -> str | None:
 def activate_admin(db: Session, user: User, code: str) -> User:
     """Promove o próprio usuário logado mediante o código de ativação.
 
-    Com ``ADMIN_SETUP_CODE`` definido, o código do operador permanece válido
-    (ele controla o segredo). Sem a variável, o código gerado é de uso único:
-    é apagado após a promoção e a ativação fica encerrada para os demais.
+    Com ``ADMIN_SETUP_CODE`` definido, o código do operador funciona como uma
+    chave mestra: vale a qualquer momento, mesmo que já exista administrador
+    (útil para recuperar o acesso). Sem a variável, o código gerado é de uso
+    único: é apagado após a promoção e a ativação fica encerrada para os demais.
     """
     if user.role == UserRole.admin:
         raise ValueError("Você já é administrador.")
-    # Encerra a ativação assim que existir um admin: ninguém mais entra por aqui.
-    if _admin_exists(db) or _setting(db, _ADMIN_CONSUMED_KEY) is not None:
-        raise ValueError("A ativação por código já foi utilizada.")
 
     env_code = (settings.admin_setup_code or "").strip()
     provided = (code or "").strip()
-    expected = env_code or _setting(db, _ADMIN_CODE_KEY) or ensure_admin_setup_code(db)
-    if not expected or not provided or not secrets.compare_digest(expected, provided):
-        raise ValueError("Código de ativação inválido.")
 
-    # Consome o código e registra que a ativação já foi usada.
-    db.query(AppSetting).filter(AppSetting.key == _ADMIN_CODE_KEY).delete()
-    db.add(AppSetting(key=_ADMIN_CONSUMED_KEY, value=str(user.id)))
+    if env_code:
+        # Chave mestra do operador: não depende de existir/ não existir admin.
+        if not provided or not secrets.compare_digest(env_code, provided):
+            raise ValueError("Código de ativação inválido.")
+    else:
+        # Código gerado automaticamente: uso único e encerrado após o 1º admin.
+        if _admin_exists(db) or _setting(db, _ADMIN_CONSUMED_KEY) is not None:
+            raise ValueError("A ativação por código já foi utilizada.")
+        expected = _setting(db, _ADMIN_CODE_KEY) or ensure_admin_setup_code(db)
+        if not expected or not provided or not secrets.compare_digest(expected, provided):
+            raise ValueError("Código de ativação inválido.")
+
+        # Consome o código e registra que a ativação já foi usada.
+        db.query(AppSetting).filter(AppSetting.key == _ADMIN_CODE_KEY).delete()
+        db.add(AppSetting(key=_ADMIN_CONSUMED_KEY, value=str(user.id)))
 
     user.role = UserRole.admin
     db.add(AuditLog(user_id=user.id, action="admin_activated", detail=f"email={user.email}"))
