@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { aiChat, ApiError } from "../lib/api.ts";
+import { parseRichText, type Block, type Inline } from "../lib/rich-text.ts";
 import { IconClose, IconSparkles } from "./icons.tsx";
 
 interface ChatMessage {
@@ -29,6 +30,88 @@ function friendlyError(err: unknown): string {
 
 const ERROR_BOX =
   "rounded-2xl border border-rose-700/20 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200";
+
+/** Renderiza o Markdown básico devolvido pela IA sem usar HTML cru. */
+function renderSpans(spans: Inline[]): ReactNode[] {
+  return spans.map((span, index) => {
+    switch (span.kind) {
+      case "bold":
+        return (
+          <strong key={index} className="font-extrabold">
+            {span.text}
+          </strong>
+        );
+      case "italic":
+        return <em key={index}>{span.text}</em>;
+      case "code":
+        return (
+          <code
+            key={index}
+            className="rounded bg-ink/10 px-1 py-0.5 font-mono text-[0.95em] dark:bg-white/15"
+          >
+            {span.text}
+          </code>
+        );
+      case "link":
+        return (
+          <a
+            key={index}
+            href={span.href}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="font-semibold underline underline-offset-2"
+          >
+            {span.text}
+          </a>
+        );
+      default:
+        return <span key={index}>{span.text}</span>;
+    }
+  });
+}
+
+function RichText({ text }: { text: string }) {
+  const blocks: Block[] = parseRichText(text);
+  return (
+    <div className="space-y-1.5">
+      {blocks.map((block, index) => {
+        if (block.kind === "list") {
+          const Tag = block.ordered ? "ol" : "ul";
+          return (
+            <Tag
+              key={index}
+              className={`space-y-0.5 pl-5 ${block.ordered ? "list-decimal" : "list-disc"}`}
+            >
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderSpans(item)}</li>
+              ))}
+            </Tag>
+          );
+        }
+        if (block.kind === "code") {
+          return (
+            <pre
+              key={index}
+              className="overflow-x-auto rounded-xl bg-ink/10 p-2 text-[11px] dark:bg-black/30"
+            >
+              <code>{block.text}</code>
+            </pre>
+          );
+        }
+        return (
+          <p
+            key={index}
+            className={`whitespace-pre-wrap break-words ${
+              block.kind === "heading" ? "font-extrabold" : ""
+            }`}
+          >
+            {renderSpans(block.spans)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 export function AiChat() {
   const [open, setOpen] = useState(false);
@@ -185,15 +268,15 @@ export function AiChat() {
                     message.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  <p
-                    className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                       message.role === "user"
                         ? "bg-brand-950 text-white dark:bg-brand-100 dark:text-brand-950"
                         : "bg-ink/5 text-ink dark:bg-white/10"
                     }`}
                   >
-                    {message.text}
-                  </p>
+                    <RichText text={message.text} />
+                  </div>
                 </div>
               ))}
 
