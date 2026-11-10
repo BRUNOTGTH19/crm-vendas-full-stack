@@ -11,6 +11,10 @@ Ordem de prioridade:
 Persistir no banco garante que as chaves permaneçam estáveis entre reinícios
 do servidor. Isso é essencial para o Web Push: se a chave pública mudar, as
 subscrições já existentes nos navegadores deixam de funcionar.
+
+A chave privada é gravada **cifrada** (AES-256-GCM, ver ``secret_box``): um
+dump do banco não entrega a chave em texto claro. Valores antigos em texto
+claro são migrados na primeira leitura.
 """
 import base64
 import hashlib
@@ -22,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from models.app_setting import AppSetting
+from services import secret_box
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +116,33 @@ def get_vapid_keys(db: Session) -> tuple[str, str]:
     # 2. Chaves persistidas no banco (ou geração + persistência).
     try:
         public_key = _get_setting(db, _PUBLIC_KEY_NAME)
-        private_key = _get_setting(db, _PRIVATE_KEY_NAME)
+        stored_private = _get_setting(db, _PRIVATE_KEY_NAME)
+        private_key = ""
+        if public_key and stored_private:
+            try:
+                private_key = secret_box.decrypt(stored_private)
+            except secret_box.SecretBoxError:
+                # JWT_SECRET_KEY trocado: a chave gravada não pode ser lida.
+                # Regerar é a única saída; as subscrições antigas serão
+                # removidas pelo provedor (404/410) na próxima entrega.
+                logger.error(
+                    "vapid_private_key_undecryptable: gerando novo par "
+                    "(JWT_SECRET_KEY mudou?)"
+                )
         if public_key and private_key:
+            if not secret_box.is_encrypted(stored_private):
+                # Migração transparente do formato legado em texto claro.
+                _set_setting(
+                    db, _PRIVATE_KEY_NAME, secret_box.encrypt(private_key)
+                )
+                logger.info("vapid_private_key_migrated_to_encrypted")
             return public_key, private_key
 
         public_key, private_key = generate_vapid_keypair()
         _set_setting(db, _PUBLIC_KEY_NAME, public_key)
-        _set_setting(db, _PRIVATE_KEY_NAME, private_key)
+        _set_setting(
+            db, _PRIVATE_KEY_NAME, secret_box.encrypt(private_key)
+        )
         logger.info("Par de chaves VAPID gerado e persistido automaticamente.")
         return public_key, private_key
     except Exception as exc:
