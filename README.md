@@ -58,10 +58,19 @@ o modal com a mensagem editável, **Copiar**, **Baixar PDF** e **Abrir WhatsApp*
 ## Assistente de IA (opcional)
 
 O botão flutuante **Assistente** aparece em todas as telas logadas (inclusive no
-celular) e abre um único chat: a IA conversa com contexto, escolhe uma das
-ferramentas fixas de leitura do CRM ou pesquisa na internet e devolve a resposta
-em linguagem natural. O histórico recente (até 12 mensagens) é enviado pelo
+celular) e abre um **painel fixo** no canto da tela: ele não bloqueia a
+aplicação (sem backdrop nem trava de scroll), então dá para continuar usando o
+CRM com o chat aberto. A IA conversa com contexto, escolhe uma das ferramentas
+fixas de leitura do CRM ou pesquisa na internet e devolve a resposta em
+linguagem natural. O histórico recente (até 12 mensagens) é enviado pelo
 frontend para manter o fio da conversa.
+
+O histórico de conversas é salvo **no próprio navegador** (`localStorage`, chave
+por `user_id`, via `src/lib/ai-chat-store.ts`): sobrevive a recarregar a página,
+tem lista de conversas e botão de apagar, sem gravar nada no servidor e sem
+custo. Limites locais: 20 conversas e 60 mensagens por conversa — o backend
+segue stateless e recebe só as últimas 12. Em outro dispositivo a conversa não
+aparece (sincronizar exigiria tabelas no MySQL e migration).
 
 Endpoint (exige `Authorization: Bearer <JWT>`):
 
