@@ -31,7 +31,7 @@ from models.sale import Sale, SaleStatus
 from models.sale_item import SaleItem
 from models.user import User
 from routers.ai import RATE_LIMIT_MESSAGE, UNAVAILABLE_MESSAGE
-from services import ai_service
+from services import ai_service, ai_web
 from services.auth_service import create_access_token
 
 client = TestClient(app)
@@ -779,7 +779,7 @@ def test_web_search_tool_runs_inside_chat(monkeypatch, seed):
             ],
         }
     )
-    monkeypatch.setattr(ai_service, "_duckduckgo_search", search)
+    monkeypatch.setattr(ai_web, "_duckduckgo_search", search)
     provider = AsyncMock(
         side_effect=[
             _completion(
