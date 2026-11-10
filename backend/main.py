@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, Response
 
 from config import settings
+from middleware.client_ip import client_ip
 from middleware.rate_limit import (
     is_login_blocked,
     is_password_reset_blocked,
@@ -60,28 +61,12 @@ app.add_middleware(
 )
 
 
-def _client_ip(request: Request) -> str:
-    """IP do cliente para os rate limits (login e redefinição de senha).
-
-    Prefere o primeiro IP de ``X-Forwarded-For`` (definido pelo proxy do
-    hosting, ex.: Render) porque atrás do load balancer o socket remoto é
-    interno — usar ``request.client.host`` ali agraria TODOS os usuários na
-    mesma chave e um atacante poderia bloquear o login de todo mundo.
-    """
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip() or "unknown"
-    if request.client:
-        return request.client.host
-    return "unknown"
-
-
 def _login_client_key(request: Request) -> str:
-    return f"login:{_client_ip(request)}"
+    return f"login:{client_ip(request)}"
 
 
 def _reset_client_key(request: Request) -> str:
-    return f"reset:{_client_ip(request)}"
+    return f"reset:{client_ip(request)}"
 
 
 @app.middleware("http")
@@ -139,6 +124,25 @@ async def force_utf8_json_charset(request: Request, call_next) -> Response:
     content_type = response.headers.get("content-type", "")
     if content_type.split(";")[0].strip().lower() == "application/json":
         response.headers["content-type"] = "application/json; charset=utf-8"
+    return response
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next) -> Response:
+    """Cabeçalhos de endurecimento do navegador (A12 da auditoria).
+
+    Não substitui uma CSP (que depende de revisar os scripts inline do
+    ``index.html``), mas remove vetores baratos: sniffing de MIME, framing,
+    vazamento de referrer e acesso a sensores.
+    """
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+    )
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
     return response
 
 app.include_router(auth.router)

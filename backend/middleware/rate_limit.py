@@ -10,6 +10,8 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 
+from config import settings
+
 # Limite por IP: 15 falhas de login em 5 minutos.
 LOGIN_MAX_FAILURES = 15
 LOGIN_WINDOW_SECONDS = 300
@@ -23,9 +25,15 @@ PASSWORD_RESET_WINDOW_SECONDS = 600
 ADMIN_ACTIVATION_MAX_ATTEMPTS = 10
 ADMIN_ACTIVATION_WINDOW_SECONDS = 600
 
+# Limite por usuário: mensagens do assistente de IA por hora. O limite real vem
+# de ``AI_MAX_MESSAGES_PER_HOUR`` (0 desliga a IA). Cada mensagem pode gerar
+# várias chamadas ao provedor, então esta cota protege a fatura/cota dele.
+AI_WINDOW_SECONDS = 3600
+
 _failures: dict[str, list[float]] = defaultdict(list)
 _reset_attempts: dict[str, list[float]] = defaultdict(list)
 _admin_attempts: dict[str, list[float]] = defaultdict(list)
+_ai_messages: dict[str, list[float]] = defaultdict(list)
 
 
 def _prune(store: dict[str, list[float]], key: str, now: float, window: float) -> None:
@@ -77,8 +85,25 @@ def record_admin_activation_failure(key: str, now: float | None = None) -> None:
     _admin_attempts[key].append(now)
 
 
+def is_ai_blocked(key: str, now: float | None = None) -> bool:
+    """True quando o usuário excedeu a cota de mensagens da IA na janela."""
+    limit = settings.ai_max_messages_per_hour
+    if limit <= 0:
+        return False
+    now = time.monotonic() if now is None else now
+    _prune(_ai_messages, key, now, AI_WINDOW_SECONDS)
+    return len(_ai_messages.get(key, ())) >= limit
+
+
+def record_ai_message(key: str, now: float | None = None) -> None:
+    now = time.monotonic() if now is None else now
+    _prune(_ai_messages, key, now, AI_WINDOW_SECONDS)
+    _ai_messages[key].append(now)
+
+
 def reset_rate_limit() -> None:
     """Limpa contadores (usado pelos testes)."""
     _failures.clear()
     _reset_attempts.clear()
     _admin_attempts.clear()
+    _ai_messages.clear()

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -8,6 +10,7 @@ from services import queue_service
 from services.sale_service import get_sale
 
 router = APIRouter(prefix="/queue", tags=["Queue"])
+logger = logging.getLogger(__name__)
 
 
 def _assert_owns_job(db: Session, job: dict, owner_id: int | None) -> None:
@@ -70,9 +73,12 @@ def download_pdf(
         )
     _assert_owns_job(db, job, owner_id)
     if job["status"] == "error":
+        # A14: o detalhe interno (caminho, SQL, exceção) fica no log; o cliente
+        # recebe uma mensagem estável com o id do job para correlacionar.
+        logger.error("pdf_job_failed job_id=%s error=%s", job_id, job.get("error"))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Falha ao gerar PDF: {job['error']}",
+            detail=f"Falha ao gerar o PDF (job {job_id}). Tente novamente.",
         )
     if job["status"] != "done":
         raise HTTPException(

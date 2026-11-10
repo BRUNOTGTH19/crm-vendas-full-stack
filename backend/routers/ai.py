@@ -3,18 +3,22 @@
 O token JWT é obrigatório em ambas as rotas. O escopo dos dados vem de
 ``resolve_data_owner`` (usuário comum = próprio id; admin = global ou usuário
 selecionado via ``X-View-User``); nenhum argumento do modelo é aceito como
-escopo de dados.
+escopo de dados. Cada usuário tem uma cota de mensagens por hora
+(``AI_MAX_MESSAGES_PER_HOUR``), porque cada chamada pode acionar o provedor
+externo várias vezes.
 """
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import get_db
 from middleware.auth_middleware import (
     get_current_user_dependency,
     resolve_data_owner,
 )
+from middleware.rate_limit import is_ai_blocked, record_ai_message
 from models.user import User, UserRole
 from schemas.ai import (
     ChatRequest,
@@ -35,6 +39,31 @@ RATE_LIMIT_MESSAGE = (
 PROVIDER_ERROR_MESSAGE = (
     "Não foi possível consultar a IA agora. Tente novamente em instantes."
 )
+AI_DISABLED_MESSAGE = "O assistente de IA está desativado neste ambiente."
+AI_QUOTA_MESSAGE = (
+    "Limite de mensagens do assistente atingido. Tente novamente mais tarde."
+)
+
+
+def _enforce_ai_quota(user: User) -> None:
+    """Cota por usuário (A3): protege a fatura do provedor de IA.
+
+    O contador é em memória (mesma limitação dos outros rate limits) e conta
+    a tentativa antes da chamada — erros do provedor também consomem cota.
+    """
+    if settings.ai_max_messages_per_hour <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=AI_DISABLED_MESSAGE,
+        )
+    key = f"ai:{user.id}"
+    if is_ai_blocked(key):
+        logger.warning("ai_quota_exceeded user_id=%s", user.id)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=AI_QUOTA_MESSAGE,
+        )
+    record_ai_message(key)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -45,6 +74,7 @@ async def chat_endpoint(
     owner_id: int | None = Depends(resolve_data_owner),
 ):
     """Consulta dados via tools fixas no escopo resolvido para o usuário."""
+    _enforce_ai_quota(current_user)
     is_admin = bool(current_user.role == UserRole.admin)
     try:
         reply = await ai_service.generate_chat_reply(
@@ -94,6 +124,7 @@ async def status_message_endpoint(
     current_user: User = Depends(get_current_user_dependency),  # noqa: B008
 ):
     """Gera um texto curto para o usuário revisar/copiar. Não grava nem envia."""
+    _enforce_ai_quota(current_user)
     try:
         message = await ai_service.generate_status_message(
             current_user.id,
