@@ -1,0 +1,95 @@
+name: Backup MySQL
+
+# Dump diário do MySQL de produção. O Render não oferece cron no plano gratuito,
+# então o agendamento vive no GitHub Actions: o job roda `backup_mysql.py` contra
+# a `DATABASE_URL` guardada em secret e publica o dump como artifact.
+#
+# Configuração (uma vez):
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Nome: DATABASE_URL   Valor: mysql+pymysql://user:senha@host:porta/banco
+#
+# Sem o secret o job apenas registra um aviso e termina com sucesso, para não
+# gerar falhas diárias antes da configuração.
+
+on:
+  schedule:
+    # 06:00 UTC = 03:00 em America/Sao_Paulo.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      restore_check:
+        description: "Restaurar o dump em um banco descartável para validar"
+        type: boolean
+        default: false
+
+concurrency:
+  group: backup-mysql
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Dump do MySQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir o secret DATABASE_URL
+        id: guard
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::DATABASE_URL não configurado; backup ignorado."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar cliente MySQL e dependências
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mysql-client
+          pip install -r backend/requirements.txt
+
+      - name: Gerar o dump
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Obrigatórios pelo Settings, não usados pelo script de backup.
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: apenas-para-o-script-de-backup
+        run: python backup_mysql.py --output-dir "$RUNNER_TEMP/backups" --keep 1
+
+      - name: Validar a restauração (opcional)
+        if: steps.guard.outputs.skip != 'true' && inputs.restore_check
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: apenas-para-o-script-de-backup
+        run: |
+          dump=$(ls "$RUNNER_TEMP"/backups/*.sql.gz | head -n 1)
+          python restore_mysql.py --dump "$dump" \
+            --database "crm_restore_check_${GITHUB_RUN_ID}" \
+            --create --compare --drop
+
+      - name: Publicar o dump
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/backups/*.sql.gz
+          retention-days: 14
+          if-no-files-found: error
