@@ -7,9 +7,11 @@ from models.user import UserRole
 
 
 class UserCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
     email: EmailStr
-    password: str
+    # Limite de 72 bytes: o bcrypt trunca silenciosamente acima disso, então
+    # aceitar senhas maiores dá falsa sensação de segurança (A10).
+    password: str = Field(min_length=8, max_length=72)
     role: Literal["user"] = "user"
 
 
@@ -29,18 +31,19 @@ class PasswordResetRequest(BaseModel):
 
     Disponibilizado na tela de login para quem esqueceu a senha. ATENÇÃO: por
     decisão de produto, basta o e-mail cadastrado — qualquer pessoa que saiba
-    o e-mail pode trocar a senha. O endpoint é protegido por rate limit por IP.
+    o e-mail pode trocar a senha. O endpoint é protegido por rate limit por IP
+    e vem **desligado** por padrão (``ALLOW_LEGACY_PASSWORD_RESET``).
     """
 
     email: EmailStr
-    new_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=8, max_length=72)
 
 
 class PasswordResetConfirmRequest(BaseModel):
     """Corpo do POST /auth/reset-password/confirm (token gerado pelo admin)."""
 
     token: str = Field(min_length=1, max_length=256)
-    new_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=8, max_length=72)
 
 
 class PasswordResetTokenResponse(BaseModel):

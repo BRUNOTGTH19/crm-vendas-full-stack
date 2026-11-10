@@ -15,7 +15,11 @@ from models.user import User, UserRole
 from redis_client import redis_client
 from schemas.user import UserCreate
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=settings.bcrypt_rounds,
+)
 
 SESSION_TTL_SECONDS = settings.access_token_expire_minutes * 60  # 8 horas (doc 2.2 / 4.2)
 RESET_TOKEN_TTL_MINUTES = 15
@@ -51,6 +55,16 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
+
+
+def _codes_match(expected: str, provided: str) -> bool:
+    """Compara códigos em tempo constante e sem ``TypeError`` com não-ASCII.
+
+    ``secrets.compare_digest`` só aceita ``str`` composto de ASCII; um acento
+    no código configurado (ou colado pelo usuário) derrubava a ativação com
+    500. Comparar os bytes resolve (A9 da auditoria).
+    """
+    return secrets.compare_digest(expected.encode("utf-8"), provided.encode("utf-8"))
 
 
 def create_access_token(data: dict, token_version: int) -> str:
@@ -188,14 +202,14 @@ def activate_admin(db: Session, user: User, code: str) -> User:
 
     if env_code:
         # Chave mestra do operador: não depende de existir/ não existir admin.
-        if not provided or not secrets.compare_digest(env_code, provided):
+        if not provided or not _codes_match(env_code, provided):
             raise ValueError("Código de ativação inválido.")
     else:
         # Código gerado automaticamente: uso único e encerrado após o 1º admin.
         if _admin_exists(db) or _setting(db, _ADMIN_CONSUMED_KEY) is not None:
             raise ValueError("A ativação por código já foi utilizada.")
         expected = _setting(db, _ADMIN_CODE_KEY) or ensure_admin_setup_code(db)
-        if not expected or not provided or not secrets.compare_digest(expected, provided):
+        if not expected or not provided or not _codes_match(expected, provided):
             raise ValueError("Código de ativação inválido.")
 
         # Consome o código e registra que a ativação já foi usada.
@@ -314,8 +328,18 @@ def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
 
 def login_user(db: Session, email: str, password: str) -> dict:
     user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.password_hash):
+    if not user:
         raise ValueError("Credenciais inválidas")
+
+    # ``verify_and_update`` re-hasheia senhas antigas (custo 12 do passlib) para
+    # o custo configurado, sem exigir que o usuário troque a senha. O verify em
+    # si é o trecho mais caro do login; o custo 11 responde ~2x mais rápido.
+    valid, new_hash = pwd_context.verify_and_update(password, user.password_hash)
+    if not valid:
+        raise ValueError("Credenciais inválidas")
+    if new_hash:
+        user.password_hash = new_hash
+        db.commit()
 
     _promote_bootstrap_admin(db, user)
     if user.role != UserRole.admin:
@@ -324,7 +348,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
     payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     access_token = create_access_token(payload, user.token_version)
     refresh_token = create_refresh_token(payload, user.token_version)
-    create_session(user.id, access_token, refresh_token)
+    # A sessão no Redis é apenas informativa (nada a lê para autenticar). Quem
+    # grava é o router, em background, para não somar latência ao login.
 
     return {
         "access_token": access_token,
@@ -350,12 +375,15 @@ def refresh_tokens(db: Session, refresh_token: str) -> dict:
     new_payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     access_token = create_access_token(new_payload, user.token_version)
     new_refresh = create_refresh_token(new_payload, user.token_version)
-    create_session(user.id, access_token, new_refresh)
+    # Sessão informativa gravada pelo router em background (não bloqueia).
 
     return {
         "access_token": access_token,
         "refresh_token": new_refresh,
         "token_type": "bearer",
+        # Interno: o router usa para gravar a sessão informativa em background.
+        # O response_model (RefreshResponse) não expõe este campo.
+        "user_id": user.id,
     }
 
 
@@ -375,7 +403,8 @@ def get_current_user(db: Session, token: str) -> User:
         raise ValueError("Sessão invalidada. Faça login novamente.")
 
     # A consulta do usuário já era necessária; o "tv" é comparado na mesma linha.
+    # ``ensure_admin_setup_code`` saiu daqui: era escrita no caminho de leitura
+    # (A15) e custava uma consulta extra em TODA requisição autenticada. A
+    # geração acontece no login, quando faz sentido.
     _promote_bootstrap_admin(db, user)
-    if user.role != UserRole.admin:
-        ensure_admin_setup_code(db)
     return user

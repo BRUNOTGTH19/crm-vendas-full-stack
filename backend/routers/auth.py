@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import logging
+import time
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import get_db
+from middleware.client_ip import client_ip
 from middleware.rate_limit import (
     is_admin_activation_blocked,
     record_admin_activation_failure,
 )
+from models.audit_log import AuditLog
 from schemas.user import (
     AdminActivationRequest,
     PasswordResetConfirmRequest,
@@ -21,6 +27,7 @@ from schemas.user import (
 from services.auth_service import (
     activate_admin,
     confirm_password_reset,
+    create_session,
     get_current_user,
     login_user,
     refresh_tokens,
@@ -30,6 +37,10 @@ from services.auth_service import (
 )
 
 INVALID_RESET_TOKEN_MESSAGE = "Token inválido ou expirado."
+LEGACY_RESET_DISABLED_MESSAGE = (
+    "A redefinição por e-mail está desativada. Peça um token ao administrador."
+)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer_scheme = HTTPBearer()
@@ -45,22 +56,45 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: UserLogin, db: Session = Depends(get_db)):
+def login(
+    data: UserLogin,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    started = time.perf_counter()
     try:
         result = login_user(db, data.email, data.password)
-        return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user = result["user"]
+    # Sessão no Redis é informativa (nada a lê para autenticar). Gravar em
+    # background tira o round-trip do Upstash do caminho crítico do login.
+    background_tasks.add_task(
+        create_session, user.id, result["access_token"], result["refresh_token"]
+    )
+    logger.info(
+        "login_ok user_id=%s duration_ms=%.1f",
+        user.id,
+        (time.perf_counter() - started) * 1000,
+    )
+    return result
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
 def reset_password_endpoint(data: PasswordResetRequest, db: Session = Depends(get_db)):
-    """Redefinição simples de senha direto na tela de login (sem link ou código).
+    """Redefinição simples de senha (legado) — desativada por padrão.
 
-    Basta o e-mail cadastrado + a nova senha. Protegido por rate limit por IP
-    (10 chamadas / 10 minutos). A troca incrementa ``token_version``: access e
-    refresh tokens emitidos antes dela passam a ser rejeitados.
+    Basta o e-mail cadastrado + a nova senha, então qualquer pessoa que saiba o
+    e-mail pode trocar a senha (A1 da auditoria). O fluxo seguro por token
+    (``/auth/reset-password/confirm``) é o recomendado. Para reativar em um
+    ambiente controlado, defina ``ALLOW_LEGACY_PASSWORD_RESET=true``.
     """
+    if not settings.allow_legacy_password_reset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=LEGACY_RESET_DISABLED_MESSAGE,
+        )
     try:
         reset_password(db, data.email, data.new_password)
     except ValueError as e:
@@ -104,11 +138,20 @@ def logout(
 
 
 @router.post("/refresh", response_model=RefreshResponse)
-def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+def refresh(
+    data: RefreshRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     try:
-        return refresh_tokens(db, data.refresh_token)
+        result = refresh_tokens(db, data.refresh_token)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    user_id = int(result["user_id"])
+    background_tasks.add_task(
+        create_session, user_id, result["access_token"], result["refresh_token"]
+    )
+    return result
 
 
 @router.get("/me", response_model=UserResponse)
@@ -135,7 +178,7 @@ def activate_admin_endpoint(
     O código vem de ``ADMIN_SETUP_CODE`` ou é gerado pelo backend e mostrado
     **apenas no log do servidor** na primeira vez que o app é aberto sem admin.
     """
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     if is_admin_activation_blocked(ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -149,4 +192,14 @@ def activate_admin_endpoint(
         return activate_admin(db, user, data.code)
     except ValueError as e:
         record_admin_activation_failure(ip)
+        # A16: tentativas falhas passam a deixar trilha (sem registrar o código).
+        if "já é administrador" not in str(e):
+            db.add(
+                AuditLog(
+                    user_id=user.id,
+                    action="admin_activation_failed",
+                    detail="invalid_code",
+                )
+            )
+            db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
