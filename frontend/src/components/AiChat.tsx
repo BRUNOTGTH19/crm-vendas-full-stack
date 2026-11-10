@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { aiChat, aiStatusMessage, ApiError, copyToClipboard } from "../lib/api.ts";
+import { aiChat, ApiError } from "../lib/api.ts";
 import { IconClose, IconSparkles } from "./icons.tsx";
-
-type Mode = "chat" | "status";
 
 interface ChatMessage {
   id: number;
@@ -34,20 +32,11 @@ const ERROR_BOX =
 
 export function AiChat() {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("chat");
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  const [reason, setReason] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [order, setOrder] = useState("");
-  const [statusBusy, setStatusBusy] = useState(false);
-  const [statusError, setStatusError] = useState("");
-  const [generated, setGenerated] = useState("");
-  const [copied, setCopied] = useState(false);
 
   const nextId = useRef(1);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -99,34 +88,6 @@ export function AiChat() {
     }
   }
 
-  async function generateStatus(event: FormEvent) {
-    event.preventDefault();
-    if (!reason.trim() || statusBusy) return;
-    setStatusBusy(true);
-    setStatusError("");
-    setGenerated("");
-    setCopied(false);
-    try {
-      const response = await aiStatusMessage({
-        motivo: reason.trim(),
-        cliente: clientName.trim() || null,
-        pedido: order.trim() || null,
-      });
-      setGenerated(response.message);
-    } catch (err) {
-      setStatusError(friendlyError(err));
-    } finally {
-      setStatusBusy(false);
-    }
-  }
-
-  async function copyGenerated() {
-    if (!generated) return;
-    await copyToClipboard(generated);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  }
-
   function startNewConversation() {
     if (busy) return;
     setMessages([]);
@@ -171,7 +132,7 @@ export function AiChat() {
                 <p className="text-[11px] text-ink/70">
                   Dados do CRM + web · somente leitura
                 </p>
-                {mode === "chat" && messages.length > 0 && (
+                {messages.length > 0 && (
                   <button
                     type="button"
                     onClick={startNewConversation}
@@ -193,221 +154,95 @@ export function AiChat() {
               </button>
             </header>
 
-            <div
-              role="tablist"
-              aria-label="Modo do assistente"
-              className="flex gap-1 border-b border-ink/[0.06] px-3 py-2 dark:border-white/10"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "chat"}
-                onClick={() => {
-                  setMode("chat");
-                  setError("");
-                }}
-                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-bold transition ${
-                  mode === "chat"
-                    ? "bg-brand-950 text-white dark:bg-lime dark:text-brand-950"
-                    : "text-ink/70 hover:bg-ink/5 dark:hover:bg-white/5"
-                }`}
-              >
-                Consultar dados
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "status"}
-                onClick={() => {
-                  setMode("status");
-                  setStatusError("");
-                }}
-                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-bold transition ${
-                  mode === "status"
-                    ? "bg-brand-950 text-white dark:bg-lime dark:text-brand-950"
-                    : "text-ink/70 hover:bg-ink/5 dark:hover:bg-white/5"
-                }`}
-              >
-                Criar status
-              </button>
+            <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              {messages.length === 0 && !busy && (
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-ink/70">
+                    Pergunte sobre clientes, vendas, cobranças, pagamentos,
+                    produtos ou relatórios. Também pode pedir uma pesquisa na
+                    web. A IA consulta os dados no seu escopo e não altera
+                    nada.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SUGGESTIONS.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => setInput(suggestion)}
+                        className="min-h-11 rounded-full border border-ink/10 bg-white/60 px-3 text-left text-xs font-semibold text-ink/70 transition hover:border-brand-500 hover:bg-brand-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-brand-300/40 dark:hover:bg-brand-400/10"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <p
+                    className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
+                      message.role === "user"
+                        ? "bg-brand-950 text-white dark:bg-brand-100 dark:text-brand-950"
+                        : "bg-ink/5 text-ink dark:bg-white/10"
+                    }`}
+                  >
+                    {message.text}
+                  </p>
+                </div>
+              ))}
+
+              {busy && (
+                <div className="flex justify-start">
+                  <p className="rounded-2xl bg-ink/5 px-3 py-2 text-sm text-ink/70 dark:bg-white/10">
+                    Consultando dados e web…
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div role="alert" className={ERROR_BOX}>
+                  {error}
+                </div>
+              )}
+              <div ref={endRef} />
             </div>
 
-            {mode === "chat" ? (
-              <>
-                <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-                  {messages.length === 0 && !busy && (
-                    <div className="space-y-3">
-                      <p className="text-sm leading-relaxed text-ink/70">
-                        Pergunte sobre clientes, vendas, cobranças, pagamentos,
-                        produtos ou relatórios. Também pode pedir uma pesquisa na
-                        web. A IA consulta os dados no seu escopo e não altera
-                        nada.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {SUGGESTIONS.map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => setInput(suggestion)}
-                            className="min-h-11 rounded-full border border-ink/10 bg-white/60 px-3 text-left text-xs font-semibold text-ink/70 transition hover:border-brand-500 hover:bg-brand-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-brand-300/40 dark:hover:bg-brand-400/10"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${
-                        message.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <p
-                        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
-                          message.role === "user"
-                            ? "bg-brand-950 text-white dark:bg-brand-100 dark:text-brand-950"
-                            : "bg-ink/5 text-ink dark:bg-white/10"
-                        }`}
-                      >
-                        {message.text}
-                      </p>
-                    </div>
-                  ))}
-
-                  {busy && (
-                    <div className="flex justify-start">
-                      <p className="rounded-2xl bg-ink/5 px-3 py-2 text-sm text-ink/70 dark:bg-white/10">
-                        Consultando dados e web…
-                      </p>
-                    </div>
-                  )}
-
-                  {error && (
-                    <div role="alert" className={ERROR_BOX}>
-                      {error}
-                    </div>
-                  )}
-                  <div ref={endRef} />
-                </div>
-
-                <form onSubmit={sendMessage} className="border-t border-ink/[0.06] p-3 dark:border-white/10">
-                  <div className="flex items-end gap-2">
-                    <textarea
-                      value={input}
-                      onChange={(event) => setInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          void sendMessage();
-                        }
-                      }}
-                      maxLength={1000}
-                      rows={2}
-                      disabled={busy}
-                      aria-label="Mensagem para o assistente"
-                      placeholder="Ex.: quanto vendi em outubro?"
-                      className="field min-h-11 flex-1 resize-none disabled:opacity-60"
-                    />
-                    <button
-                      type="submit"
-                      disabled={busy || !input.trim()}
-                      className="btn btn-primary btn-sm shrink-0"
-                    >
-                      {busy ? "…" : "Enviar"}
-                    </button>
-                  </div>
-                  <p className="mt-1.5 text-[10px] leading-snug text-ink/70">
-                    A IA não altera dados. Confira valores e fontes antes de usar.
-                  </p>
-                </form>
-              </>
-            ) : (
-              <form onSubmit={generateStatus} className="flex-1 space-y-3 overflow-y-auto p-4">
-                <div>
-                  <label htmlFor="ai-status-reason" className="label">
-                    Motivo do status *
-                  </label>
-                  <textarea
-                    id="ai-status-reason"
-                    required
-                    maxLength={200}
-                    rows={3}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    placeholder="Ex.: o pedido 123 atrasou um dia"
-                    className="field resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                  <div>
-                    <label htmlFor="ai-status-client" className="label">
-                      Cliente (opcional)
-                    </label>
-                    <input
-                      id="ai-status-client"
-                      type="text"
-                      maxLength={100}
-                      value={clientName}
-                      onChange={(event) => setClientName(event.target.value)}
-                      placeholder="Nome do cliente"
-                      className="field"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="ai-status-order" className="label">
-                      Pedido (opcional)
-                    </label>
-                    <input
-                      id="ai-status-order"
-                      type="text"
-                      maxLength={60}
-                      value={order}
-                      onChange={(event) => setOrder(event.target.value)}
-                      placeholder="Ex.: 123"
-                      className="field"
-                    />
-                  </div>
-                </div>
-
+            <form onSubmit={sendMessage} className="border-t border-ink/[0.06] p-3 dark:border-white/10">
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void sendMessage();
+                    }
+                  }}
+                  maxLength={1000}
+                  rows={2}
+                  disabled={busy}
+                  aria-label="Mensagem para o assistente"
+                  placeholder="Ex.: quanto vendi em outubro?"
+                  className="field min-h-11 flex-1 resize-none disabled:opacity-60"
+                />
                 <button
                   type="submit"
-                  disabled={statusBusy || !reason.trim()}
-                  className="btn btn-primary w-full"
+                  disabled={busy || !input.trim()}
+                  className="btn btn-primary btn-sm shrink-0"
                 >
-                  {statusBusy ? "Gerando…" : "Gerar frase"}
+                  {busy ? "…" : "Enviar"}
                 </button>
-
-                {statusError && (
-                  <div role="alert" className={ERROR_BOX}>
-                    {statusError}
-                  </div>
-                )}
-
-                {generated && (
-                  <div className="rounded-2xl border border-brand-700/20 bg-brand-50 p-3 dark:border-brand-300/20 dark:bg-brand-400/15">
-                    <p className="whitespace-pre-wrap break-words text-sm text-brand-700 dark:text-brand-200">
-                      {generated}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void copyGenerated()}
-                      className="btn btn-ghost btn-sm mt-3"
-                    >
-                      {copied ? "Copiado!" : "Copiar texto"}
-                    </button>
-                  </div>
-                )}
-
-                <p className="text-[10px] leading-snug text-ink/70">
-                  Revise antes de copiar. Nenhuma mensagem é enviada ou gravada
-                  automaticamente.
-                </p>
-              </form>
-            )}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-snug text-ink/70">
+                A IA não altera dados. Confira valores e fontes antes de usar.
+              </p>
+            </form>
           </section>
         </div>
       )}

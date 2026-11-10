@@ -30,7 +30,7 @@ import re
 import socket
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Literal
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -100,12 +100,15 @@ FALLBACK_TOOL_LIMIT = (
 SYSTEM_PROMPT = """Você é o assistente do CRM Vendas. Responda em português do Brasil, \
 de forma clara, objetiva e cordial. Hoje é {today}.
 
-Você tem duas capacidades:
-1. Consultar os dados do CRM com as ferramentas fornecidas (clientes, vendas, itens, \
-pagamentos, cobranças, relatórios, perfil e, para administradores, usuários). Use as \
-ferramentas sempre que a pergunta envolver dados da aplicação. Para perguntas amplas, \
-comece pelo resumo ou painel e depois detalhe. Nunca invente números: se a ferramenta \
-não retornar dados suficientes, diga o que falta e peça esclarecimento.
+Você tem acesso de LEITURA a todo o sistema do usuário e duas capacidades:
+1. Consultar QUALQUER dado do CRM com as ferramentas fornecidas: painel/visão geral, \
+faturamento, caixa do mês, clientes, detalhes de cliente, vendas, detalhes de venda, \
+itens/produtos, pagamentos, cobranças vencidas, rankings e perfil. Para administradores, \
+também usuários do sistema. Sempre que a pergunta envolver dados da aplicação (números, \
+clientes, vendas, produtos, cobranças, pagamentos, relatórios), USE as ferramentas — \
+nunca diga que não tem acesso nem responda de memória. Para perguntas amplas, comece por \
+get_dashboard_overview e depois detalhe. Nunca invente números: se a ferramenta não \
+retornar dados suficientes, diga o que falta e peça esclarecimento.
 2. Responder perguntas gerais e buscar informações atuais na internet com web_search e \
 fetch_url. Cite as URLs usadas quando a resposta vier da web.
 
@@ -146,6 +149,40 @@ TOOLS: list[dict[str, Any]] = [
                     "fim": {"type": "string", "format": "date", "description": "Data final ISO."},
                 },
                 "required": ["inicio", "fim"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_dashboard_overview",
+            "description": (
+                "Visão geral do escopo atual: total de clientes e vendas, recebido, "
+                "pendente, faturamento do mês, cobranças pendentes e atrasadas, "
+                "vendas recentes e produtos mais vendidos. Use para perguntas amplas "
+                "como 'como está meu negócio' ou 'resumo geral'."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_cashflow",
+            "description": (
+                "Fechamento de caixa de um mês (padrão: mês atual): quantidade e total "
+                "de vendas, total pago, saldo pendente e recebimentos registrados no "
+                "período. Informe o mês no formato AAAA-MM."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "month": {
+                        "type": "string",
+                        "description": "Mês de referência no formato AAAA-MM (opcional).",
+                    }
+                },
                 "additionalProperties": False,
             },
         },
@@ -495,6 +532,26 @@ class SalesSummaryArgs(BaseModel):
         return self
 
 
+class DashboardOverviewArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CashflowArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+
+    @model_validator(mode="after")
+    def validate_month(self) -> CashflowArgs:
+        if self.month is not None:
+            year, month = (int(part) for part in self.month.split("-"))
+            if not 1 <= month <= 12:
+                raise ValueError("mês inválido")
+            if not 2000 <= year <= 2100:
+                raise ValueError("ano inválido")
+        return self
+
+
 class ListOverdueArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -643,6 +700,8 @@ class FetchUrlArgs(BaseModel):
 
 DB_TOOL_MODELS: dict[str, type[BaseModel]] = {
     "get_sales_summary": SalesSummaryArgs,
+    "get_dashboard_overview": DashboardOverviewArgs,
+    "get_cashflow": CashflowArgs,
     "list_overdue": ListOverdueArgs,
     "get_sale_status": SaleStatusArgs,
     "search_clients": SearchClientsArgs,
@@ -818,6 +877,165 @@ def _sales_summary(db: Session, scope: ToolScope, args: SalesSummaryArgs) -> dic
         "total": float(row[1] or 0),
         "paid_total": float(row[2] or 0),
         "pending_total": float(row[3] or 0),
+    }
+
+
+def _month_bounds(month: str | None) -> tuple[date, date]:
+    """Primeiro e último dia do mês informado (padrão: mês atual)."""
+    today = local_today()
+    if month is None:
+        year, mon = today.year, today.month
+    else:
+        year, mon = (int(part) for part in month.split("-"))
+    first = date(year, mon, 1)
+    following = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
+    return first, following - timedelta(days=1)
+
+
+def _dashboard_overview(
+    db: Session, scope: ToolScope, _args: DashboardOverviewArgs
+) -> dict[str, Any]:
+    today = local_today()
+    first_day_month = today.replace(day=1)
+
+    total_clients = _scoped_clients(db.query(func.count(Client.id)), scope).scalar() or 0
+    total_sales = _scoped_sales(db.query(func.count(Sale.id)), scope).scalar() or 0
+    revenue_paid = (
+        _scoped_sales(
+            db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+                Sale.status == SaleStatus.paid
+            ),
+            scope,
+        ).scalar()
+        or 0
+    )
+    revenue_pending = (
+        _scoped_sales(
+            db.query(func.coalesce(func.sum(Sale.remaining), 0)).filter(
+                Sale.status == SaleStatus.pending
+            ),
+            scope,
+        ).scalar()
+        or 0
+    )
+    pending_count = (
+        _scoped_sales(
+            db.query(func.count(Sale.id)).filter(Sale.status == SaleStatus.pending),
+            scope,
+        ).scalar()
+        or 0
+    )
+    overdue_count = (
+        _scoped_sales(
+            db.query(func.count(Sale.id)).filter(
+                Sale.status == SaleStatus.pending,
+                Sale.due_date < today,
+            ),
+            scope,
+        ).scalar()
+        or 0
+    )
+    revenue_month = (
+        _scoped_sales(
+            db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+                Sale.status == SaleStatus.paid,
+                Sale.sale_date >= first_day_month,
+            ),
+            scope,
+        ).scalar()
+        or 0
+    )
+    recent_sales = (
+        _scoped_sales(db.query(Sale), scope)
+        .order_by(Sale.created_at.desc(), Sale.id.desc())
+        .limit(5)
+        .all()
+    )
+    top_products = (
+        _scoped_sales(
+            db.query(
+                SaleItem.product_name,
+                func.sum(SaleItem.quantity).label("total_quantity"),
+                func.sum(SaleItem.subtotal).label("total_revenue"),
+            ).join(Sale, Sale.id == SaleItem.sale_id),
+            scope,
+        )
+        .group_by(SaleItem.product_name)
+        .order_by(func.sum(SaleItem.quantity).desc())
+        .limit(5)
+        .all()
+    )
+
+    return {
+        "today": today.isoformat(),
+        "scope": scope.scope_key,
+        "total_clients": int(total_clients),
+        "total_sales": int(total_sales),
+        "revenue_paid": float(revenue_paid),
+        "revenue_pending": float(revenue_pending),
+        "revenue_month": float(revenue_month),
+        "pending_count": int(pending_count),
+        "overdue_count": int(overdue_count),
+        "recent_sales": [
+            {
+                "sale_id": sale.id,
+                "client_id": sale.client_id,
+                "client_name": sale.client.full_name if sale.client else None,
+                "sale_date": sale.sale_date.isoformat() if sale.sale_date else None,
+                "status": getattr(sale.status, "value", str(sale.status)),
+                "total": float(sale.total or 0),
+                "remaining": float(sale.remaining or 0),
+            }
+            for sale in recent_sales
+        ],
+        "top_products": [
+            {
+                "product_name": row.product_name,
+                "total_quantity": int(row.total_quantity or 0),
+                "total_revenue": float(row.total_revenue or 0),
+            }
+            for row in top_products
+        ],
+    }
+
+
+def _cashflow(db: Session, scope: ToolScope, args: CashflowArgs) -> dict[str, Any]:
+    first, last = _month_bounds(args.month)
+    stats = _scoped_sales(
+        db.query(
+            func.count(Sale.id),
+            func.coalesce(func.sum(Sale.total), 0),
+            func.coalesce(
+                func.sum(case((Sale.status == SaleStatus.paid, Sale.total), else_=0)), 0
+            ),
+            func.coalesce(
+                func.sum(case((Sale.status == SaleStatus.pending, Sale.remaining), else_=0)),
+                0,
+            ),
+        ).filter(Sale.sale_date >= first, Sale.sale_date <= last),
+        scope,
+    ).one()
+    received = (
+        _scoped_sales(
+            db.query(func.coalesce(func.sum(Payment.amount_paid), 0))
+            .join(Sale, Sale.id == Payment.sale_id)
+            .filter(Payment.payment_date >= first, Payment.payment_date <= last),
+            scope,
+        ).scalar()
+        or 0
+    )
+    return {
+        "period": {
+            "month": f"{first:%Y-%m}",
+            "start": first.isoformat(),
+            "end": last.isoformat(),
+        },
+        "scope": scope.scope_key,
+        "sales_count": int(stats[0] or 0),
+        "sales_total": float(stats[1] or 0),
+        "paid_total": float(stats[2] or 0),
+        "pending_remaining": float(stats[3] or 0),
+        "received_total": float(received or 0),
     }
 
 
@@ -1309,6 +1527,8 @@ def _user_summary(db: Session, scope: ToolScope, args: UserSummaryArgs) -> dict[
 
 _DB_HANDLERS: dict[str, Callable[[Session, ToolScope, Any], dict[str, Any]]] = {
     "get_sales_summary": _sales_summary,
+    "get_dashboard_overview": _dashboard_overview,
+    "get_cashflow": _cashflow,
     "list_overdue": _overdue,
     "get_sale_status": _sale_status,
     "search_clients": _search_clients,
@@ -1326,6 +1546,8 @@ _DB_HANDLERS: dict[str, Callable[[Session, ToolScope, Any], dict[str, Any]]] = {
 
 _TOOL_TTLS = {
     "get_sales_summary": SUMMARY_CACHE_TTL,
+    "get_dashboard_overview": SUMMARY_CACHE_TTL,
+    "get_cashflow": REPORT_CACHE_TTL,
     "list_overdue": OVERDUE_CACHE_TTL,
     "get_sale_status": SALE_STATUS_CACHE_TTL,
     "get_client_details": LIST_CACHE_TTL,

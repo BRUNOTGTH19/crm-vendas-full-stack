@@ -859,3 +859,64 @@ def test_fetch_url_tool_returns_error_in_chat_for_private_target(monkeypatch, se
     result = _tool_message(_second_call_payload(provider))
     assert "error" in result
     assert "Destino não permitido" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Painel e caixa (cobertura completa dos dados do CRM)
+# ---------------------------------------------------------------------------
+def test_dashboard_overview_is_scoped(seed):
+    with SessionLocal() as db:
+        own = ai_service.execute_tool(db, seed["user_a"], "get_dashboard_overview", {})
+        assert own["scope"] == str(seed["user_a"])
+        assert own["total_clients"] == 1
+        assert own["total_sales"] == 2
+        assert own["revenue_paid"] == 100.0
+        assert own["revenue_pending"] == 40.0
+        assert own["pending_count"] == 1
+        assert own["overdue_count"] == 1
+        assert len(own["recent_sales"]) == 2
+        assert own["top_products"][0]["product_name"] == "Produto IA A"
+
+        other = ai_service.execute_tool(db, seed["user_b"], "get_dashboard_overview", {})
+        assert other["total_sales"] == 1
+        assert other["revenue_paid"] == 9999.0
+        assert other["revenue_pending"] == 0.0
+
+        admin_global = ai_service.execute_tool(
+            db, seed["admin"], "get_dashboard_overview", {}, is_admin=True
+        )
+        assert admin_global["scope"] == "global"
+        assert admin_global["total_sales"] == 3
+        assert admin_global["revenue_paid"] == 10099.0
+        assert admin_global["revenue_pending"] == 40.0
+
+
+def test_cashflow_is_scoped_and_validates_month(seed):
+    with SessionLocal() as db:
+        own = ai_service.execute_tool(
+            db, seed["user_a"], "get_cashflow", {"month": "2026-10"}
+        )
+        assert own["period"]["month"] == "2026-10"
+        assert own["sales_count"] == 2
+        assert own["sales_total"] == 150.0
+        assert own["paid_total"] == 100.0
+        assert own["pending_remaining"] == 40.0
+        assert own["received_total"] == 110.0
+
+        other = ai_service.execute_tool(
+            db, seed["user_b"], "get_cashflow", {"month": "2026-10"}
+        )
+        assert other["sales_count"] == 1
+        assert other["sales_total"] == 9999.0
+        assert other["received_total"] == 0.0
+
+        # Mês inválido e tentativa de sobrescrever o escopo são rejeitados.
+        with pytest.raises(ai_service.AIToolError):
+            ai_service.execute_tool(db, seed["user_a"], "get_cashflow", {"month": "2026-13"})
+        with pytest.raises(ai_service.AIToolError):
+            ai_service.execute_tool(
+                db,
+                seed["user_a"],
+                "get_cashflow",
+                {"month": "2026-10", "user_id": seed["user_b"]},
+            )

@@ -65,6 +65,15 @@ export function clearSession(): void {
   window.dispatchEvent(new Event("crm_auth_changed"));
 }
 
+/**
+ * Atualiza o usuário salvo (ex.: papel alterado no servidor) sem trocar o
+ * token. Dispara `crm_auth_changed` para a UI recalcular os menus.
+ */
+export function updateSessionUser(user: User): void {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event("crm_auth_changed"));
+}
+
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 function detailFrom(data: unknown, fallback: string): string {
@@ -142,6 +151,11 @@ export const api = {
   patch: <T>(path: string) => request<T>("PATCH", path),
   del: <T = void>(path: string, body?: unknown) => request<T>("DELETE", path, body),
 };
+
+/** Dados atuais do usuário autenticado (fonte da verdade do papel/role). */
+export function authMe(): Promise<User> {
+  return api.get<User>("/auth/me");
+}
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -455,16 +469,6 @@ export interface AiChatHistoryMessage {
   content: string;
 }
 
-export interface AiStatusMessageInput {
-  motivo: string;
-  cliente?: string | null;
-  pedido?: string | null;
-}
-
-export interface AiStatusMessageResponse {
-  message: string;
-}
-
 /**
  * Consulta dados do CRM e/ou a web via tools fixas do backend.
  * O histórico é opcional e ajuda o assistente a manter o contexto.
@@ -474,9 +478,4 @@ export function aiChat(
   history: AiChatHistoryMessage[] = [],
 ): Promise<AiChatResponse> {
   return api.post<AiChatResponse>("/ai/chat", { message, history });
-}
-
-/** Gera uma frase de status para revisão/cópia. Nada é gravado ou enviado. */
-export function aiStatusMessage(input: AiStatusMessageInput): Promise<AiStatusMessageResponse> {
-  return api.post<AiStatusMessageResponse>("/ai/status-message", input);
 }
