@@ -139,20 +139,38 @@ def _promote_bootstrap_admin(db: Session, user: User) -> bool:
         return False
     if (user.email or "").strip().lower() != admin_email:
         return False
+    # A11: o bootstrap por e-mail só vale para o PRIMEIRO administrador. Antes,
+    # quem registrasse o e-mail de ADMIN_EMAIL virava admin no login a qualquer
+    # momento — inclusive depois da configuração inicial, sem prova de posse do
+    # e-mail. A recuperação passa a ser explícita (código mestra ou manage.py).
+    if _admin_exists(db):
+        logging.getLogger(__name__).warning(
+            "admin_bootstrap_ignored reason=admin_exists user_id=%s", user.id
+        )
+        return False
     user.role = UserRole.admin
     db.commit()
     db.refresh(user)
-    logging.getLogger(__name__).info("admin_promoted user_id=%s", user.id)
+    logging.getLogger(__name__).warning(
+        "admin_promoted_bootstrap user_id=%s (ADMIN_EMAIL)", user.id
+    )
     return True
 
 
+# Texto claro do código gerado (legado, migrado na leitura).
 _ADMIN_CODE_KEY = "admin_setup_code"
+# A13: o código de ativação fica só como SHA-256; vazar a tabela não o revela.
+_ADMIN_CODE_HASH_KEY = "admin_setup_code_hash"
 _ADMIN_CONSUMED_KEY = "admin_setup_consumed"
 
 
 def _setting(db: Session, key: str) -> str | None:
     row = db.query(AppSetting).filter(AppSetting.key == key).first()
     return row.value if row else None
+
+
+def _hash_admin_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
 def _admin_exists(db: Session) -> bool:
@@ -163,8 +181,8 @@ def ensure_admin_setup_code(db: Session) -> str | None:
     """Gera (uma única vez) o código de ativação e o registra no log.
 
     Só age quando ainda não existe administrador e ``ADMIN_SETUP_CODE`` não foi
-    definido. O código fica no banco (estável entre reinícios) e **nunca** é
-    devolvido pela API: quem tiver acesso ao log do servidor é que o lê.
+    definido. Apenas o hash SHA-256 fica no banco; o texto claro aparece **uma
+    vez** no log do servidor e nunca é devolvido pela API.
     """
     if (settings.admin_setup_code or "").strip():
         return None
@@ -173,12 +191,20 @@ def ensure_admin_setup_code(db: Session) -> str | None:
         return None
     if _setting(db, _ADMIN_CONSUMED_KEY) is not None:
         return None
-    stored = _setting(db, _ADMIN_CODE_KEY)
-    if stored:
-        return stored
+
+    # Migração de bancos antigos: o código em texto claro vira hash.
+    legacy = _setting(db, _ADMIN_CODE_KEY)
+    if legacy:
+        db.query(AppSetting).filter(AppSetting.key == _ADMIN_CODE_KEY).delete()
+        db.add(AppSetting(key=_ADMIN_CODE_HASH_KEY, value=_hash_admin_code(legacy)))
+        db.commit()
+        return legacy
+
+    if _setting(db, _ADMIN_CODE_HASH_KEY):
+        return None
 
     code = secrets.token_urlsafe(9)
-    db.add(AppSetting(key=_ADMIN_CODE_KEY, value=code))
+    db.add(AppSetting(key=_ADMIN_CODE_HASH_KEY, value=_hash_admin_code(code)))
     db.commit()
     logging.getLogger(__name__).warning(
         "admin_setup_code_generated code=%s (Ativar acesso admin no app)", code
@@ -208,12 +234,22 @@ def activate_admin(db: Session, user: User, code: str) -> User:
         # Código gerado automaticamente: uso único e encerrado após o 1º admin.
         if _admin_exists(db) or _setting(db, _ADMIN_CONSUMED_KEY) is not None:
             raise ValueError("A ativação por código já foi utilizada.")
-        expected = _setting(db, _ADMIN_CODE_KEY) or ensure_admin_setup_code(db)
-        if not expected or not provided or not _codes_match(expected, provided):
+        expected_hash = _setting(db, _ADMIN_CODE_HASH_KEY)
+        if not expected_hash:
+            # Gera agora (ou migra o legado em texto claro).
+            ensure_admin_setup_code(db)
+            expected_hash = _setting(db, _ADMIN_CODE_HASH_KEY)
+        if (
+            not expected_hash
+            or not provided
+            or not secrets.compare_digest(_hash_admin_code(provided), expected_hash)
+        ):
             raise ValueError("Código de ativação inválido.")
 
         # Consome o código e registra que a ativação já foi usada.
-        db.query(AppSetting).filter(AppSetting.key == _ADMIN_CODE_KEY).delete()
+        db.query(AppSetting).filter(
+            AppSetting.key.in_([_ADMIN_CODE_KEY, _ADMIN_CODE_HASH_KEY])
+        ).delete(synchronize_session=False)
         db.add(AppSetting(key=_ADMIN_CONSUMED_KEY, value=str(user.id)))
 
     user.role = UserRole.admin
@@ -222,6 +258,40 @@ def activate_admin(db: Session, user: User, code: str) -> User:
     db.refresh(user)
     logging.getLogger(__name__).info("admin_activated user_id=%s", user.id)
     return user
+
+
+def rotate_admin_setup_code(db: Session) -> str:
+    """Invalida o código atual e gera um novo (A4).
+
+    A rotação é o que limita o dano de um vazamento: o código antigo deixa de
+    valer imediatamente. Com ``ADMIN_SETUP_CODE`` definido, a variável de
+    ambiente é a fonte da verdade — altere-a no provedor e reinicie.
+    """
+    if (settings.admin_setup_code or "").strip():
+        raise ValueError(
+            "ADMIN_SETUP_CODE está definido no ambiente; altere a variável e "
+            "reinicie o serviço para rotacionar."
+        )
+    db.query(AppSetting).filter(
+        AppSetting.key.in_([_ADMIN_CODE_KEY, _ADMIN_CODE_HASH_KEY, _ADMIN_CONSUMED_KEY])
+    ).delete(synchronize_session=False)
+    code = secrets.token_urlsafe(12)
+    db.add(AppSetting(key=_ADMIN_CODE_HASH_KEY, value=_hash_admin_code(code)))
+    db.commit()
+    logging.getLogger(__name__).warning(
+        "admin_setup_code_rotated (novo código exibido apenas no comando)"
+    )
+    return code
+
+
+def expire_admin_setup_code(db: Session) -> None:
+    """Encerra a ativação por código gerado (mantém a chave mestra do ambiente)."""
+    db.query(AppSetting).filter(
+        AppSetting.key.in_([_ADMIN_CODE_KEY, _ADMIN_CODE_HASH_KEY])
+    ).delete(synchronize_session=False)
+    db.add(AppSetting(key=_ADMIN_CONSUMED_KEY, value="expired"))
+    db.commit()
+    logging.getLogger(__name__).info("admin_setup_code_expired")
 
 
 def register_user(db: Session, data: UserCreate) -> User:

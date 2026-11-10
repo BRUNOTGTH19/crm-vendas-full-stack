@@ -4,6 +4,7 @@ Cobrem: código gerado e registrado no log, promoção do usuário logado,
 consumo único, código definido por ``ADMIN_SETUP_CODE``, bootstrap por
 ``ADMIN_EMAIL``, exigência de autenticação e rate limit por IP.
 """
+import re
 from datetime import datetime, timezone
 
 import pytest
@@ -20,6 +21,7 @@ from models.user import User
 client = TestClient(app)
 
 CODE_KEY = "admin_setup_code"
+CODE_HASH_KEY = "admin_setup_code_hash"
 CONSUMED_KEY = "admin_setup_consumed"
 
 
@@ -67,10 +69,17 @@ def test_generated_code_promotes_once_and_is_logged(caplog):
     _register("Outro", other_email)
     owner = _login(owner_email)
 
+    # A13: só o hash fica no banco. O texto claro aparece uma vez no log.
     with SessionLocal() as db:
-        code = db.query(AppSetting).filter(AppSetting.key == CODE_KEY).one().value
-    assert code and len(code) >= 10
-    assert "admin_setup_code_generated" in caplog.text
+        stored_hash = (
+            db.query(AppSetting).filter(AppSetting.key == CODE_HASH_KEY).one().value
+        )
+        assert db.query(AppSetting).filter(AppSetting.key == CODE_KEY).count() == 0
+    assert len(stored_hash) == 64
+    match = re.search(r"admin_setup_code_generated code=(\S+)", caplog.text)
+    assert match, caplog.text
+    code = match.group(1)
+    assert code not in stored_hash
 
     # Código errado não promove.
     r = _activate(owner, "codigo-errado")
@@ -85,6 +94,7 @@ def test_generated_code_promotes_once_and_is_logged(caplog):
 
     with SessionLocal() as db:
         assert db.query(AppSetting).filter(AppSetting.key == CODE_KEY).count() == 0
+        assert db.query(AppSetting).filter(AppSetting.key == CODE_HASH_KEY).count() == 0
         assert db.query(AppSetting).filter(AppSetting.key == CONSUMED_KEY).count() == 1
         assert db.query(AuditLog).filter(AuditLog.action == "admin_activated").count() == 1
 
@@ -93,6 +103,26 @@ def test_generated_code_promotes_once_and_is_logged(caplog):
     r = _activate(other, code)
     assert r.status_code == 400
     assert client.get("/admin/users", headers=other).status_code == 403
+
+
+def test_legacy_plaintext_code_is_migrated_to_hash():
+    """Bancos antigos guardavam o código em texto claro; a leitura migra."""
+    stamp = _stamp()
+    email = f"legado_{stamp}@crm.com"
+    _register("Legado", email)
+    with SessionLocal() as db:
+        db.add(AppSetting(key=CODE_KEY, value="codigo-legado-123"))
+        db.commit()
+
+    headers = _login(email)  # login gera/migra o código
+    with SessionLocal() as db:
+        assert db.query(AppSetting).filter(AppSetting.key == CODE_KEY).count() == 0
+        stored = (
+            db.query(AppSetting).filter(AppSetting.key == CODE_HASH_KEY).one().value
+        )
+    assert stored != "codigo-legado-123"
+    assert _activate(headers, "codigo-legado-123").status_code == 200
+
 
 
 def test_env_code_works_even_with_existing_admin(monkeypatch):
@@ -199,4 +229,64 @@ def test_failed_activation_leaves_audit_trail(monkeypatch):
         )
     assert log.user_id == created["id"]
     assert log.detail == "invalid_code"
+
+
+def test_admin_email_does_not_promote_when_admin_exists(monkeypatch):
+    """A11: o bootstrap por e-mail vale só para o primeiro administrador."""
+    stamp = _stamp()
+    monkeypatch.setattr(settings, "admin_email", f"chefe_{stamp}@crm.com")
+    with SessionLocal() as db:
+        db.add(
+            User(
+                name="Admin Existente",
+                email=f"ja_admin_{stamp}@crm.com",
+                password_hash="x",
+                role="admin",
+            )
+        )
+        db.commit()
+
+    email = f"chefe_{stamp}@crm.com"
+    _register("Chefe", email)
+    headers = _login(email)
+    assert client.get("/admin/users", headers=headers).status_code == 403
+
+
+def test_rotation_invalidates_previous_code(monkeypatch, caplog):
+    """A4: girar o código invalida imediatamente o anterior."""
+    from services.auth_service import rotate_admin_setup_code
+
+    monkeypatch.setattr(settings, "admin_setup_code", "")
+    stamp = _stamp()
+    email = f"rot_{stamp}@crm.com"
+    _register("Rotacao", email)
+    _login(email)  # gera o primeiro código
+    old_code = re.search(r"admin_setup_code_generated code=(\S+)", caplog.text).group(1)
+
+    with SessionLocal() as db:
+        new_code = rotate_admin_setup_code(db)
+
+    assert new_code != old_code
+    headers = _login(email)
+    assert _activate(headers, old_code).status_code == 400
+    assert _activate(headers, new_code).status_code == 200
+
+
+def test_expire_disables_generated_code(monkeypatch, caplog):
+    """A4: encerrar a ativação não deixa um código novo utilizável."""
+    from services.auth_service import expire_admin_setup_code
+
+    monkeypatch.setattr(settings, "admin_setup_code", "")
+    stamp = _stamp()
+    email = f"exp_{stamp}@crm.com"
+    _register("Expira", email)
+    _login(email)
+    code = re.search(r"admin_setup_code_generated code=(\S+)", caplog.text).group(1)
+
+    with SessionLocal() as db:
+        expire_admin_setup_code(db)
+
+    headers = _login(email)
+    assert _activate(headers, code).status_code == 400
+
 

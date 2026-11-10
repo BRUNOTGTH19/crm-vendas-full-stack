@@ -250,19 +250,23 @@ def test_public_register_rejects_admin_role():
     assert r.status_code == 422
 
 
-def test_bootstrap_admin_promotes_configured_email(monkeypatch):
+def test_admin_email_does_not_promote_when_an_admin_already_exists(monkeypatch):
+    """A11: o bootstrap por ADMIN_EMAIL vale só para o primeiro admin.
+
+    A promoção positiva (ausência de admin) é coberta em
+    ``test_admin_activation.py``; aqui garantimos que conhecer o e-mail de
+    ADMIN_EMAIL não escala privilégio depois da configuração inicial.
+    """
     stamp = datetime.now(timezone.utc).strftime("%H%M%S%f")
     email = f"bootstrap_{stamp}@crm.com"
     _register("Bootstrap Admin", email)
 
-    # Sem ADMIN_EMAIL, o usuário continua comum.
-    monkeypatch.setattr(settings, "admin_email", "")
-    assert client.get("/admin/users", headers=_login(email)).status_code == 403
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.role == "admin").count() >= 1
 
-    # Definindo o e-mail (comparação sem caixa), o login promove a admin.
     monkeypatch.setattr(settings, "admin_email", f"  {email.upper()}  ")
     headers = _login(email)
-    assert client.get("/admin/users", headers=headers).status_code == 200
+    assert client.get("/admin/users", headers=headers).status_code == 403
 
     with SessionLocal() as db:
-        assert db.query(User).filter(User.email == email).one().role == "admin"
+        assert db.query(User).filter(User.email == email).one().role != "admin"
