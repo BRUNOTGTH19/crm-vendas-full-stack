@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api.ts";
 import { fmtDate, fmtMoney } from "../lib/format.ts";
 import { StatusBadge } from "../components/StatusBadge.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
 import type { Client, Sale } from "../types.ts";
 
 export function History() {
@@ -39,20 +40,22 @@ export function History() {
   const total = sales.reduce((acc, s) => acc + parseFloat(s.remaining), 0);
 
   return (
-    <div>
-      <h1 className="mb-2 text-2xl font-bold text-white">Histórico</h1>
-      <p className="mb-6 text-sm text-zinc-400">
-        Consulte todas as vendas de um cliente (doc 3.2 — histórico/consulta por cliente).
-      </p>
+    <div className="animate-fade-up space-y-5">
+      <PageHeader
+        title="Histórico"
+        eyebrow="Consulta"
+        subtitle="Consulte todas as vendas de um cliente e o saldo devedor."
+      />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <select
           value={clientId}
           onChange={(e) => {
             setClientId(e.target.value);
             load(e.target.value);
           }}
-          className="min-h-11 min-w-56 max-w-full rounded-full border border-white/10 bg-[#26215C] px-4 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+          className="field w-auto min-w-56 max-w-full"
+          aria-label="Selecionar cliente"
         >
           <option value="">Selecione um cliente…</option>
           {clients.map((c) => (
@@ -62,30 +65,37 @@ export function History() {
           ))}
         </select>
         {selected && (
-          <span className="text-sm text-zinc-400">
+          <span className="text-sm text-ink/70">
             {sales.length} venda(s) · Saldo devedor{" "}
-            <span className="font-semibold text-[#FAC775]">{fmtMoney(total)}</span>
+            <span className="money font-bold text-ink">{fmtMoney(total)}</span>
           </span>
         )}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+        >
           {error}
         </div>
       )}
 
       {busy ? (
-        <p className="text-sm text-zinc-400">Carregando…</p>
+        <p className="text-sm text-ink/70">Carregando…</p>
       ) : !clientId ? (
-        <p className="text-sm text-zinc-400">Escolha um cliente para ver o histórico.</p>
+        <div className="card p-8 text-center">
+          <p className="text-sm text-ink/70">Escolha um cliente para ver o histórico.</p>
+        </div>
       ) : sales.length === 0 ? (
-        <p className="text-sm text-zinc-400">Este cliente ainda não tem vendas.</p>
+        <div className="card p-8 text-center">
+          <p className="text-sm text-ink/70">Este cliente ainda não tem vendas.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase text-zinc-400">
+              <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Total</th>
@@ -95,14 +105,17 @@ export function History() {
             </thead>
             <tbody>
               {sales.map((s) => (
-                <tr key={s.id} className="border-t border-white/5">
-                  <td className="px-4 py-2.5 font-medium text-zinc-300">#{s.id}</td>
-                  <td className="px-4 py-2.5 text-zinc-100">{fmtDate(s.sale_date)}</td>
-                  <td className="px-4 py-2.5 font-semibold text-white">{fmtMoney(s.total)}</td>
-                  <td className="px-4 py-2.5">
+                <tr
+                  key={s.id}
+                  className="border-t border-ink/[0.06] transition hover:bg-ink/[0.03] dark:border-white/10 dark:hover:bg-white/5"
+                >
+                  <td className="px-4 py-3 font-semibold text-ink/70">#{s.id}</td>
+                  <td className="px-4 py-3 text-ink">{fmtDate(s.sale_date)}</td>
+                  <td className="money px-4 py-3 font-bold text-ink">{fmtMoney(s.total)}</td>
+                  <td className="px-4 py-3">
                     <StatusBadge status={s.status} />
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(s.due_date)}</td>
+                  <td className="px-4 py-3 text-ink/70">{fmtDate(s.due_date)}</td>
                 </tr>
               ))}
             </tbody>

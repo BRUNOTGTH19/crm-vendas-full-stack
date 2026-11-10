@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { api, ApiError, resetPassword, setSession } from "../lib/api.ts";
 import type { TokenResponse } from "../types.ts";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { IconReports } from "../components/icons.tsx";
 
 export function Login({ notice = "" }: { notice?: string }) {
   const [email, setEmail] = useState("");
@@ -64,165 +66,191 @@ export function Login({ notice = "" }: { notice?: string }) {
     }
   }
 
+  const footerLink = "font-bold text-brand-700 hover:underline dark:text-brand-300";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-md rounded-3xl bg-[#26215C] p-8 shadow-2xl">
-        <div className="mb-8 text-center">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#534AB7] text-2xl font-bold text-[#FAC775]">
-            C
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]">
+        <ThemeToggle />
+      </div>
+
+      <div className="animate-fade-up w-full max-w-md">
+        <div className="mb-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-950 text-lime shadow-card dark:bg-lime dark:text-brand-950">
+            <IconReports className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">CRM PWA de Vendas</h1>
-          <p className="mt-1 text-sm text-zinc-400">Acesse seu painel de vendas</p>
+          <h1 className="mt-4 text-2xl font-extrabold tracking-[-0.03em] text-ink sm:text-3xl">
+            CRM PWA de Vendas
+          </h1>
+          <p className="page-subtitle mt-1">Acesse seu painel de vendas</p>
         </div>
 
-        {notice && (
-          <div
-            role="alert"
-            className="mb-4 rounded-2xl border border-[#BA7517]/40 bg-[#BA7517]/20 px-4 py-2.5 text-sm text-[#FAC775]"
-          >
-            {notice}
-          </div>
-        )}
-
-        {ok && (
-          <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-300">
-            {ok}
-          </div>
-        )}
-
-        {mode === "login" ? (
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-200">E-mail</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-              placeholder="voce@crm.com"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-200">Senha</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-              {error}
+        <div className="card p-6 sm:p-8">
+          {notice && (
+            <div
+              role="alert"
+              className="mb-4 rounded-2xl border border-amber-700/20 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-300/20 dark:bg-amber-400/15 dark:text-amber-200"
+            >
+              {notice}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-          >
-            {busy ? "Entrando…" : "Entrar"}
-          </button>
-        </form>
-        ) : (
-        <form onSubmit={submitReset} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-200">E-mail cadastrado</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-              placeholder="voce@crm.com"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-200">Nova senha</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-              placeholder="mínimo 6 caracteres"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-200">Confirmar nova senha</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-              placeholder="repita a nova senha"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-              {error}
+          {ok && (
+            <div
+              role="status"
+              className="mb-4 rounded-2xl border border-brand-700/20 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/15 dark:text-brand-200"
+            >
+              {ok}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-          >
-            {busy ? "Redefinindo…" : "Redefinir senha"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setMode("login");
-              setError("");
-            }}
-            className="min-h-11 w-full rounded-full border border-white/10 py-2.5 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-          >
-            Voltar para o login
-          </button>
-        </form>
-        )}
-
-        <p className="mt-6 text-center text-sm text-zinc-400">
           {mode === "login" ? (
-            <>
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label className="label" htmlFor="login-email">
+                  E-mail
+                </label>
+                <input
+                  id="login-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="field"
+                  placeholder="voce@crm.com"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="login-password">
+                  Senha
+                </label>
+                <input
+                  id="login-password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="field"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+                >
+                  {error}
+                </div>
+              )}
+
+              <button type="submit" disabled={busy} className="btn btn-primary w-full">
+                {busy ? "Entrando…" : "Entrar"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={submitReset} className="space-y-4">
+              <div>
+                <label className="label" htmlFor="reset-email">
+                  E-mail cadastrado
+                </label>
+                <input
+                  id="reset-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="field"
+                  placeholder="voce@crm.com"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="reset-password">
+                  Nova senha
+                </label>
+                <input
+                  id="reset-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="field"
+                  placeholder="mínimo 6 caracteres"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="reset-confirm">
+                  Confirmar nova senha
+                </label>
+                <input
+                  id="reset-confirm"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="field"
+                  placeholder="repita a nova senha"
+                />
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+                >
+                  {error}
+                </div>
+              )}
+
+              <button type="submit" disabled={busy} className="btn btn-primary w-full">
+                {busy ? "Redefinindo…" : "Redefinir senha"}
+              </button>
               <button
                 type="button"
-                onClick={openReset}
-                className="font-medium text-[#FAC775] hover:underline"
+                disabled={busy}
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
+                className="btn btn-ghost w-full"
               >
-                Esqueci minha senha
+                Voltar para o login
               </button>
-              <span className="mx-2 text-zinc-600">•</span>
-              <a href="#/reset-password" className="font-medium text-[#FAC775] hover:underline">
-                Tenho um token
-              </a>
-              <span className="mx-2 text-zinc-600">•</span>
-              Ainda não tem conta?{" "}
-              <a href="#/register" className="font-medium text-[#FAC775] hover:underline">
-                Cadastre-se
-              </a>
-            </>
-          ) : (
-            <>Sem link ou e-mail: informe o e-mail cadastrado e escolha a nova senha.</>
+            </form>
           )}
-        </p>
+
+          <p className="mt-6 text-center text-sm leading-relaxed text-ink/70">
+            {mode === "login" ? (
+              <>
+                <button type="button" onClick={openReset} className={footerLink}>
+                  Esqueci minha senha
+                </button>
+                <span aria-hidden className="mx-2 text-ink/40">
+                  •
+                </span>
+                <a href="#/reset-password" className={footerLink}>
+                  Tenho um token
+                </a>
+                <span aria-hidden className="mx-2 text-ink/40">
+                  •
+                </span>
+                Ainda não tem conta?{" "}
+                <a href="#/register" className={footerLink}>
+                  Cadastre-se
+                </a>
+              </>
+            ) : (
+              <>Sem link ou e-mail: informe o e-mail cadastrado e escolha a nova senha.</>
+            )}
+          </p>
+        </div>
       </div>
     </div>
   );

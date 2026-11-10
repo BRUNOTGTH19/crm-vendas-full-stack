@@ -3,8 +3,13 @@ import { api, ApiError, downloadSaleReceipt } from "../lib/api.ts";
 import { Modal } from "../components/Modal.tsx";
 import { PaymentModal, paymentPayload } from "../components/PaymentModal.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
+import { IconPlus } from "../components/icons.tsx";
 import { fmtDate, fmtMoney } from "../lib/format.ts";
 import type { Client, Sale, SaleStatus } from "../types.ts";
+
+const ERROR_BOX =
+  "rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200";
 
 export function Sales() {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -140,66 +145,67 @@ function SalesPage(props: {
   } = props;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Vendas</h1>
-        <a
-          href="#/sales/new"
-          className="inline-flex min-h-11 items-center rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
-        >
-          + Nova venda
-        </a>
-      </div>
+    <div className="animate-fade-up space-y-5">
+      <PageHeader
+        title="Vendas"
+        eyebrow="Movimento"
+        subtitle="Filtre por status ou cliente e acompanhe cada venda."
+        actions={
+          <a href="#/sales/new" className="btn btn-primary btn-sm">
+            <IconPlus className="h-4 w-4" />
+            Nova venda
+          </a>
+        }
+      />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as "" | SaleStatus)}
-          className="rounded-xl border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+          className="field w-auto"
+          aria-label="Filtrar por status"
         >
-          <option value="" className="bg-[#1A1A1A]">Todos os status</option>
-          <option value="pending" className="bg-[#1A1A1A]">Pendentes</option>
-          <option value="paid" className="bg-[#1A1A1A]">Pagas</option>
+          <option value="">Todos os status</option>
+          <option value="pending">Pendentes</option>
+          <option value="paid">Pagas</option>
         </select>
 
         <select
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="rounded-xl border border-white/10 bg-[#26215C] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+          className="field w-auto max-w-[16rem]"
+          aria-label="Filtrar por cliente"
         >
-          <option value="" className="bg-[#1A1A1A]">Todos os clientes</option>
+          <option value="">Todos os clientes</option>
           {clients.map((c) => (
-            <option key={c.id} value={String(c.id)} className="bg-[#1A1A1A]">
+            <option key={c.id} value={String(c.id)}>
               {c.full_name}
             </option>
           ))}
         </select>
 
-        <button
-          type="button"
-          onClick={onReload}
-          disabled={busy}
-          className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-white/5 disabled:opacity-50"
-        >
+        <button type="button" onClick={onReload} disabled={busy} className="btn btn-ghost btn-sm">
           {busy ? "Carregando…" : "Atualizar"}
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div role="alert" className={ERROR_BOX}>
           {error}
         </div>
       )}
 
       {busy && sales.length === 0 ? (
-        <p className="text-sm text-zinc-400">Carregando…</p>
+        <p className="text-sm text-ink/70">Carregando…</p>
       ) : sales.length === 0 ? (
-        <p className="text-sm text-zinc-400">Nenhuma venda com esses filtros.</p>
+        <div className="card p-8 text-center">
+          <p className="text-sm text-ink/70">Nenhuma venda com esses filtros.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+              <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Cliente</th>
                 <th className="px-4 py-3">Data</th>
@@ -211,23 +217,22 @@ function SalesPage(props: {
             </thead>
             <tbody>
               {sales.map((s) => (
-                <tr key={s.id} className="border-t border-white/5 hover:bg-white/5">
-                  <td className="px-4 py-2.5 font-medium text-zinc-300">#{s.id}</td>
-                  <td className="px-4 py-2.5 text-white">
+                <tr
+                  key={s.id}
+                  className="border-t border-ink/[0.06] transition hover:bg-ink/[0.03] dark:border-white/10 dark:hover:bg-white/5"
+                >
+                  <td className="px-4 py-3 font-semibold text-ink/70">#{s.id}</td>
+                  <td className="px-4 py-3 font-bold text-ink">
                     {clientName.get(s.client_id) ?? `Cliente ${s.client_id}`}
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(s.sale_date)}</td>
-                  <td className="px-4 py-2.5 font-medium text-white">{fmtMoney(s.total)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-3 text-ink/70">{fmtDate(s.sale_date)}</td>
+                  <td className="money px-4 py-3 font-bold text-ink">{fmtMoney(s.total)}</td>
+                  <td className="px-4 py-3">
                     <StatusBadge status={s.status} />
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-400">{fmtDate(s.due_date)}</td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => onView(s)}
-                      className="min-h-11 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/5"
-                    >
+                  <td className="px-4 py-3 text-ink/70">{fmtDate(s.due_date)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button type="button" onClick={() => onView(s)} className="btn btn-ghost btn-sm">
                       Ver
                     </button>
                     {s.status === "pending" && (
@@ -235,7 +240,7 @@ function SalesPage(props: {
                         type="button"
                         onClick={() => onPay(s)}
                         disabled={busy}
-                        className="ml-1.5 min-h-11 rounded-full border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                        className="btn btn-lime btn-sm ml-1.5"
                       >
                         Pagar
                       </button>
@@ -244,7 +249,7 @@ function SalesPage(props: {
                       type="button"
                       onClick={() => onPdf(s.id)}
                       disabled={busy}
-                      className="ml-1.5 min-h-11 rounded-full border border-[#534AB7] px-3 py-1.5 text-xs font-medium text-[#B9B2F5] hover:bg-[#534AB7]/20 disabled:opacity-50"
+                      className="btn btn-ghost btn-sm ml-1.5"
                     >
                       PDF
                     </button>
@@ -259,20 +264,20 @@ function SalesPage(props: {
       {viewing && (
         <Modal title={`Venda #${viewing.id}`} onClose={() => setViewing(null)}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-zinc-400">Cliente</dt>
-            <dd className="text-white">{clientName.get(viewing.client_id) ?? "—"}</dd>
-            <dt className="text-zinc-400">Data</dt>
-            <dd className="text-white">{fmtDate(viewing.sale_date)}</dd>
-            <dt className="text-zinc-400">Status</dt>
-            <dd className="text-white capitalize">{viewing.status}</dd>
-            <dt className="text-zinc-400">Vencimento</dt>
-            <dd className="text-white">{fmtDate(viewing.due_date)}</dd>
+            <dt className="text-ink/70">Cliente</dt>
+            <dd className="font-semibold text-ink">{clientName.get(viewing.client_id) ?? "—"}</dd>
+            <dt className="text-ink/70">Data</dt>
+            <dd className="font-semibold text-ink">{fmtDate(viewing.sale_date)}</dd>
+            <dt className="text-ink/70">Status</dt>
+            <dd className="text-ink capitalize">{viewing.status}</dd>
+            <dt className="text-ink/70">Vencimento</dt>
+            <dd className="font-semibold text-ink">{fmtDate(viewing.due_date)}</dd>
           </dl>
           {/* Tabela de itens com rolagem horizontal própria dentro do modal. */}
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                   <th className="px-3 py-2">Produto</th>
                   <th className="px-3 py-2 text-right">Qtd.</th>
                   <th className="px-3 py-2 text-right">P. unit.</th>
@@ -281,20 +286,22 @@ function SalesPage(props: {
               </thead>
               <tbody>
                 {viewing.items.map((it) => (
-                  <tr key={it.id} className="border-t border-white/5">
-                    <td className="px-3 py-2 text-zinc-200">{it.product_name}</td>
-                    <td className="px-3 py-2 text-right text-zinc-400">{it.quantity}</td>
-                    <td className="px-3 py-2 text-right text-zinc-400">{fmtMoney(it.unit_price)}</td>
-                    <td className="px-3 py-2 text-right font-medium text-[#FAC775]">{fmtMoney(it.subtotal)}</td>
+                  <tr key={it.id} className="border-t border-ink/[0.06] dark:border-white/10">
+                    <td className="px-3 py-2 font-medium text-ink">{it.product_name}</td>
+                    <td className="px-3 py-2 text-right text-ink/70">{it.quantity}</td>
+                    <td className="money px-3 py-2 text-right text-ink/70">{fmtMoney(it.unit_price)}</td>
+                    <td className="money px-3 py-2 text-right font-bold text-brand-700 dark:text-brand-300">
+                      {fmtMoney(it.subtotal)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-white/10">
-                  <td colSpan={3} className="px-3 py-2.5 text-right font-semibold text-zinc-300">
+                <tr className="border-t border-ink/10 dark:border-white/15">
+                  <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-ink/70">
                     Total
                   </td>
-                  <td className="px-3 py-2.5 text-right text-base font-bold text-white">
+                  <td className="money px-3 py-2.5 text-right text-base font-extrabold text-ink">
                     {fmtMoney(viewing.total)}
                   </td>
                 </tr>

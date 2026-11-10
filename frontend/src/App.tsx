@@ -24,24 +24,24 @@ function currentPath(): string {
 /** Aviso de inatividade: o usuário pode continuar ou deixar a sessão encerrar. */
 function IdleWarning({ seconds, onKeepAlive }: { seconds: number; onKeepAlive: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/50 p-6 backdrop-blur-sm dark:bg-black/70">
       <div
         role="alertdialog"
         aria-live="assertive"
         aria-labelledby="idle-warning-title"
-        className="w-full max-w-sm rounded-3xl bg-[#26215C] p-6 text-center shadow-2xl"
+        className="animate-fade-up w-full max-w-sm rounded-3xl border border-ink/[0.06] bg-paper p-6 text-center shadow-float dark:border-white/10"
       >
-        <h2 id="idle-warning-title" className="text-lg font-bold text-white">
+        <h2 id="idle-warning-title" className="text-xl font-extrabold tracking-tight text-ink">
           Sua sessão vai expirar
         </h2>
-        <p className="mt-2 text-sm text-zinc-300">
+        <p className="mt-2 text-sm leading-relaxed text-ink/70">
           Por segurança, o sistema fecha após 2 minutos sem atividade. Ela será
-          encerrada em <strong className="text-[#FAC775]">{seconds}s</strong>.
+          encerrada em <strong className="font-extrabold text-brand-700 dark:text-lime">{seconds}s</strong>.
         </p>
         <button
           type="button"
           onClick={onKeepAlive}
-          className="mt-5 min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4]"
+          className="btn btn-primary mt-5 w-full"
         >
           Continuar logado
         </button>

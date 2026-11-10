@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api.ts";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { IconReports } from "../components/icons.tsx";
 
 export function Register() {
   const [name, setName] = useState("");
@@ -25,81 +27,103 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-md rounded-3xl bg-[#26215C] p-8 shadow-2xl">
-        <div className="mb-8 text-center">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#534AB7] text-2xl font-bold text-[#FAC775]">
-            C
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]">
+        <ThemeToggle />
+      </div>
+
+      <div className="animate-fade-up w-full max-w-md">
+        <div className="mb-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-950 text-lime shadow-card dark:bg-lime dark:text-brand-950">
+            <IconReports className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">Criar conta</h1>
-          <p className="mt-1 text-sm text-zinc-400">CRM PWA de Vendas</p>
+          <h1 className="mt-4 text-2xl font-extrabold tracking-[-0.03em] text-ink sm:text-3xl">
+            Criar conta
+          </h1>
+          <p className="page-subtitle mt-1">CRM PWA de Vendas</p>
         </div>
 
-        {ok ? (
-          <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-            Conta criada com sucesso. Você já pode entrar.
-          </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-200">Nome</label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="Seu nome completo"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-200">E-mail</label>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="voce@crm.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-200">Senha</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="Mínimo de 6 caracteres"
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+        <div className="card p-6 sm:p-8">
+          {ok ? (
+            <div
+              role="status"
+              className="rounded-2xl border border-brand-700/20 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/15 dark:text-brand-200"
             >
-              {busy ? "Criando…" : "Criar conta"}
-            </button>
-          </form>
-        )}
+              Conta criada com sucesso. Você já pode entrar.
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label className="label" htmlFor="register-name">
+                  Nome
+                </label>
+                <input
+                  id="register-name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="field"
+                  placeholder="Seu nome completo"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="register-email">
+                  E-mail
+                </label>
+                <input
+                  id="register-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="field"
+                  placeholder="voce@crm.com"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="register-password">
+                  Senha
+                </label>
+                <input
+                  id="register-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="field"
+                  placeholder="Mínimo de 6 caracteres"
+                />
+              </div>
 
-        <p className="mt-6 text-center text-sm text-zinc-400">
-          Já tem conta?{" "}
-          <a href="#/login" className="font-medium text-[#FAC775] hover:underline">
-            Entrar
-          </a>
-        </p>
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+                >
+                  {error}
+                </div>
+              )}
+
+              <button type="submit" disabled={busy} className="btn btn-primary w-full">
+                {busy ? "Criando…" : "Criar conta"}
+              </button>
+            </form>
+          )}
+
+          <p className="mt-6 text-center text-sm text-ink/70">
+            Já tem conta?{" "}
+            <a
+              href="#/login"
+              className="font-bold text-brand-700 hover:underline dark:text-brand-300"
+            >
+              Entrar
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

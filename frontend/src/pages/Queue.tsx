@@ -4,6 +4,8 @@ import { fmtDate, fmtMoney, todayISO } from "../lib/format.ts";
 import { PDFButton } from "../components/PDFButton.tsx";
 import { PaymentModal, paymentPayload } from "../components/PaymentModal.tsx";
 import { CollectionModal } from "../components/CollectionModal.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
+import { IconAlert } from "../components/icons.tsx";
 import type { Client, Sale } from "../types.ts";
 
 type ChargeSituation = "vencida" | "hoje" | "a-vencer";
@@ -16,9 +18,11 @@ function situationOf(sale: Sale): ChargeSituation {
 }
 
 const SITUATION_STYLE: Record<ChargeSituation, string> = {
-  vencida: "bg-red-500/15 text-red-300 ring-1 ring-red-500/40",
-  hoje: "bg-[#FAC775]/15 text-[#FAC775] ring-1 ring-[#BA7517]/60",
-  "a-vencer": "bg-white/5 text-zinc-300 ring-1 ring-white/10",
+  vencida:
+    "bg-rose-50 text-rose-700 ring-rose-700/15 dark:bg-rose-400/15 dark:text-rose-200 dark:ring-rose-300/20",
+  hoje: "bg-amber-50 text-amber-700 ring-amber-700/15 dark:bg-amber-400/15 dark:text-amber-200 dark:ring-amber-300/20",
+  "a-vencer":
+    "bg-ink/5 text-ink/70 ring-ink/10 dark:bg-white/5 dark:text-ink/80 dark:ring-white/10",
 };
 
 const SITUATION_LABEL: Record<ChargeSituation, string> = {
@@ -85,74 +89,67 @@ export function Queue() {
   const overdue = sales.filter((s) => situationOf(s) === "vencida").length;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Cobranças</h1>
-          <p className="text-sm text-zinc-400">
-            {sales.length} pendente(s) ·{" "}
-            <span className={overdue > 0 ? "font-semibold text-red-300" : ""}>
-              {overdue} vencida(s)
-            </span>{" "}
-            · Total {fmtMoney(total)}
-          </p>
-        </div>
-        <button
-          onClick={load}
-          disabled={busy}
-          className="rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-        >
-          {busy ? "Carregando…" : "Atualizar"}
-        </button>
-      </div>
+    <div className="animate-fade-up space-y-5">
+      <PageHeader
+        title="Cobranças"
+        eyebrow="A receber"
+        subtitle={`${sales.length} pendente(s) · ${overdue} vencida(s) · Total ${fmtMoney(total)}`}
+        actions={
+          <button onClick={load} disabled={busy} className="btn btn-primary btn-sm">
+            {busy ? "Carregando…" : "Atualizar"}
+          </button>
+        }
+      />
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+        >
           {error}
         </div>
       )}
 
       {dueCount > 0 && (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#FAC775]/40 bg-[#FAC775]/10 px-4 py-3 text-sm text-[#FAC775]">
-          <span aria-hidden>🔔</span>
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-700/20 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-300/20 dark:bg-amber-400/15 dark:text-amber-200">
+          <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            <span className="font-semibold">{dueCount}</span> cobrança(s) vencida(s)
-            ou vencendo hoje. Use <span className="font-semibold">Cobrar</span> para
-            enviar a mensagem personalizada no WhatsApp.
+            <span className="font-bold">{dueCount}</span> cobrança(s) vencida(s) ou vencendo
+            hoje. Use <span className="font-bold">Cobrar</span> para enviar a mensagem
+            personalizada no WhatsApp.
           </span>
         </div>
       )}
 
       {busy && sales.length === 0 ? (
-        <p className="text-sm text-zinc-400">Carregando…</p>
+        <p className="text-sm text-ink/70">Carregando…</p>
       ) : ordered.length === 0 ? (
-        <p className="text-sm text-zinc-400">Nenhuma cobrança pendente. 🎉</p>
+        <div className="card p-8 text-center">
+          <p className="text-sm text-ink/70">Nenhuma cobrança pendente.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {ordered.map((s) => {
             const sit = situationOf(s);
             return (
-              <div
-                key={s.id}
-                className="flex flex-wrap items-center gap-3 rounded-3xl bg-[#26215C] p-4 shadow-lg shadow-black/30"
-              >
+              <div key={s.id} className="card flex flex-wrap items-center gap-3 p-4">
                 <div className="min-w-40 flex-1">
-                  <div className="font-semibold text-white">
+                  <div className="font-bold text-ink">
                     {clientName.get(s.client_id) ?? `Cliente ${s.client_id}`}
                   </div>
-                  <div className="text-xs text-zinc-400">
+                  <div className="text-xs text-ink/70">
                     Venda #{s.id} · {fmtDate(s.sale_date)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-[#FAC775]">{fmtMoney(s.remaining)}</div>
-                  <div className="text-xs text-zinc-400">
+                  <div className="money text-lg font-extrabold text-ink">
+                    {fmtMoney(s.remaining)}
+                  </div>
+                  <div className="text-xs text-ink/70">
                     Saldo de {fmtMoney(s.total)} · Vence {fmtDate(s.due_date)}
                   </div>
                 </div>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SITUATION_STYLE[sit]}`}
-                >
+                <span className={`chip ring-1 ring-inset ${SITUATION_STYLE[sit]}`}>
                   {SITUATION_LABEL[sit]}
                 </span>
                 <div className="flex items-center gap-2">
@@ -160,7 +157,7 @@ export function Queue() {
                     type="button"
                     onClick={() => setCollecting(s)}
                     disabled={busy}
-                    className="min-h-11 rounded-full bg-[#FAC775]/90 px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] hover:bg-[#FAC775] disabled:opacity-50"
+                    className="btn btn-lime btn-sm"
                   >
                     Cobrar
                   </button>
@@ -168,7 +165,7 @@ export function Queue() {
                     type="button"
                     onClick={() => receive(s)}
                     disabled={busy}
-                    className="min-h-11 rounded-full bg-emerald-500/80 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                    className="btn btn-primary btn-sm"
                   >
                     Receber
                   </button>

@@ -450,6 +450,11 @@ export interface AiChatResponse {
   reply: string;
 }
 
+export interface AiChatHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface AiStatusMessageInput {
   motivo: string;
   cliente?: string | null;
@@ -460,9 +465,15 @@ export interface AiStatusMessageResponse {
   message: string;
 }
 
-/** Consulta dados do usuário logado via tools fixas do backend. */
-export function aiChat(message: string): Promise<AiChatResponse> {
-  return api.post<AiChatResponse>("/ai/chat", { message });
+/**
+ * Consulta dados do CRM e/ou a web via tools fixas do backend.
+ * O histórico é opcional e ajuda o assistente a manter o contexto.
+ */
+export function aiChat(
+  message: string,
+  history: AiChatHistoryMessage[] = [],
+): Promise<AiChatResponse> {
+  return api.post<AiChatResponse>("/ai/chat", { message, history });
 }
 
 /** Gera uma frase de status para revisão/cópia. Nada é gravado ou enviado. */

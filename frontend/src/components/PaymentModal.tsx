@@ -51,71 +51,77 @@ export function PaymentModal({ sale, busy, onConfirm, onClose }: PaymentModalPro
   return (
     <Modal title={`Pagamento — Venda #${sale.id}`} onClose={onClose}>
       <form onSubmit={submit} noValidate>
-        <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
-          <div>
-            <div className="text-xs uppercase text-zinc-400">Total</div>
-            <div className="font-semibold text-white">{fmtMoney(sale.total)}</div>
+        <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-2xl bg-ink/[0.04] p-3 dark:bg-white/5">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-ink/70">
+              Total
+            </div>
+            <div className="money mt-0.5 font-bold text-ink">{fmtMoney(sale.total)}</div>
           </div>
-          <div>
-            <div className="text-xs uppercase text-zinc-400">Já pago</div>
-            <div className="font-semibold text-zinc-200">{fmtMoney(sale.amount_paid)}</div>
+          <div className="rounded-2xl bg-brand-50 p-3 dark:bg-brand-400/15">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-brand-700 dark:text-brand-200">
+              Já pago
+            </div>
+            <div className="money mt-0.5 font-bold text-brand-700 dark:text-brand-200">
+              {fmtMoney(sale.amount_paid)}
+            </div>
           </div>
-          <div>
-            <div className="text-xs uppercase text-zinc-400">Saldo</div>
-            <div className="font-semibold text-[#FAC775]">{fmtMoney(sale.remaining)}</div>
+          <div className="rounded-2xl bg-amber-50 p-3 dark:bg-amber-400/15">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-200">
+              Saldo
+            </div>
+            <div className="money mt-0.5 font-bold text-amber-700 dark:text-amber-200">
+              {fmtMoney(sale.remaining)}
+            </div>
           </div>
         </div>
 
-        <label className="mb-1 block text-sm font-medium text-zinc-300">
-          Valor pago <span className="text-red-400">*</span>
+        <label className="label" htmlFor="payment-amount">
+          Valor pago <span className="text-rose-600 dark:text-rose-300">*</span>
         </label>
         <input
+          id="payment-amount"
           type="number"
           required
           min="0.01"
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+          className="field"
         />
 
         {partial && (
           <>
-            <label className="mb-1 mt-4 block text-sm font-medium text-zinc-300">
-              Nova data de cobrança <span className="text-zinc-500">(opcional)</span>
+            <label className="label mt-4" htmlFor="payment-due-date">
+              Nova data de cobrança
             </label>
             <input
+              id="payment-due-date"
               type="date"
               value={newDueDate}
               onChange={(e) => setNewDueDate(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-sm text-white focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+              className="field"
             />
-            <p className="mt-2 text-xs text-zinc-400">
+            <p className="hint mt-2">
               Pagamento parcial: restará {fmtMoney(remainingAfter)} pendente.
             </p>
           </>
         )}
 
         {error && (
-          <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          <p
+            role="alert"
+            className="mt-3 rounded-xl border border-rose-700/20 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+          >
             {error}
           </p>
         )}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-          >
+          <button type="button" onClick={onClose} disabled={busy} className="btn btn-ghost">
             Cancelar
           </button>
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-11 rounded-full bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
+          <button type="submit" disabled={busy} className="btn btn-primary">
             {busy ? "Processando…" : "Confirmar pagamento"}
           </button>
         </div>

@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, confirmPasswordReset } from "../lib/api.ts";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { IconReports } from "../components/icons.tsx";
 
 /**
  * Tela pública para confirmar a redefinição com o token entregue pelo admin.
@@ -43,122 +45,121 @@ export function ResetPasswordConfirm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-md rounded-3xl bg-[#26215C] p-6 shadow-2xl sm:p-8">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]">
+        <ThemeToggle />
+      </div>
+
+      <div className="animate-fade-up w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#534AB7] text-2xl font-bold text-[#FAC775]">
-            C
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-950 text-lime shadow-card dark:bg-lime dark:text-brand-950">
+            <IconReports className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-white">Redefinir senha</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <h1 className="mt-4 text-2xl font-extrabold tracking-[-0.03em] text-ink sm:text-3xl">
+            Redefinir senha
+          </h1>
+          <p className="page-subtitle mt-1">
             Use o token entregue pelo administrador. Ele expira em 15 minutos e
             só pode ser usado uma vez.
           </p>
         </div>
 
-        {ok ? (
-          <div className="space-y-4">
-            <div
-              role="status"
-              className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
-            >
-              Senha redefinida. Todas as sessões antigas foram encerradas.
-            </div>
-            <a
-              href="#/login"
-              className="flex min-h-11 w-full items-center justify-center rounded-full bg-[#534AB7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4]"
-            >
-              Ir para o login
-            </a>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="reset-token"
-                className="mb-1 block text-sm font-medium text-zinc-200"
-              >
-                Token de redefinição
-              </label>
-              <input
-                id="reset-token"
-                type="text"
-                required
-                autoComplete="off"
-                spellCheck={false}
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                className="min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="cole o token recebido"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="reset-password"
-                className="mb-1 block text-sm font-medium text-zinc-200"
-              >
-                Nova senha
-              </label>
-              <input
-                id="reset-password"
-                type="password"
-                required
-                minLength={6}
-                maxLength={128}
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="mínimo 6 caracteres"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="reset-confirmation"
-                className="mb-1 block text-sm font-medium text-zinc-200"
-              >
-                Confirmar nova senha
-              </label>
-              <input
-                id="reset-confirmation"
-                type="password"
-                required
-                minLength={6}
-                maxLength={128}
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
-                placeholder="repita a nova senha"
-              />
-            </div>
-
-            {error && (
+        <div className="card p-6 sm:p-8">
+          {ok ? (
+            <div className="space-y-4">
               <div
-                role="alert"
-                className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm text-red-300"
+                role="status"
+                className="rounded-2xl border border-brand-700/20 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/15 dark:text-brand-200"
               >
-                {error}
+                Senha redefinida. Todas as sessões antigas foram encerradas.
               </div>
-            )}
+              <a href="#/login" className="btn btn-primary w-full">
+                Ir para o login
+              </a>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label htmlFor="reset-token" className="label">
+                  Token de redefinição
+                </label>
+                <input
+                  id="reset-token"
+                  type="text"
+                  required
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  className="field font-mono"
+                  placeholder="cole o token recebido"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-password" className="label">
+                  Nova senha
+                </label>
+                <input
+                  id="reset-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="field"
+                  placeholder="mínimo 6 caracteres"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-confirmation" className="label">
+                  Confirmar nova senha
+                </label>
+                <input
+                  id="reset-confirmation"
+                  type="password"
+                  required
+                  minLength={6}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  className="field"
+                  placeholder="repita a nova senha"
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={busy || !token.trim()}
-              className="min-h-11 w-full rounded-full bg-[#534AB7] py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-            >
-              {busy ? "Redefinindo…" : "Redefinir senha"}
-            </button>
-          </form>
-        )}
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+                >
+                  {error}
+                </div>
+              )}
 
-        {!ok && (
-          <p className="mt-6 text-center text-sm">
-            <a href="#/login" className="font-medium text-[#FAC775] hover:underline">
-              Voltar para o login
-            </a>
-          </p>
-        )}
+              <button
+                type="submit"
+                disabled={busy || !token.trim()}
+                className="btn btn-primary w-full"
+              >
+                {busy ? "Redefinindo…" : "Redefinir senha"}
+              </button>
+            </form>
+          )}
+
+          {!ok && (
+            <p className="mt-6 text-center text-sm">
+              <a
+                href="#/login"
+                className="font-bold text-brand-700 hover:underline dark:text-brand-300"
+              >
+                Voltar para o login
+              </a>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

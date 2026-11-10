@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { aiChat, aiStatusMessage, ApiError, copyToClipboard } from "../lib/api.ts";
+import { IconClose, IconSparkles } from "./icons.tsx";
 
 type Mode = "chat" | "status";
 
@@ -12,7 +13,12 @@ interface ChatMessage {
 const SUGGESTIONS = [
   "Quanto vendi neste mês?",
   "Quais cobranças estão atrasadas?",
+  "Quais são meus melhores clientes?",
+  "Quais produtos mais vendem?",
+  "Qual é a cotação do dólar hoje?",
 ];
+
+const MAX_HISTORY = 12;
 
 function friendlyError(err: unknown): string {
   if (err instanceof ApiError) {
@@ -22,6 +28,9 @@ function friendlyError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "Não foi possível falar com o assistente agora.";
 }
+
+const ERROR_BOX =
+  "rounded-2xl border border-rose-700/20 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200";
 
 export function AiChat() {
   const [open, setOpen] = useState(false);
@@ -70,12 +79,15 @@ export function AiChat() {
     if (!text || busy) return;
 
     const userMessage: ChatMessage = { id: nextId.current++, role: "user", text };
+    const history = messages
+      .slice(-MAX_HISTORY)
+      .map((item) => ({ role: item.role, content: item.text }));
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setError("");
     setBusy(true);
     try {
-      const response = await aiChat(text);
+      const response = await aiChat(text, history);
       setMessages((current) => [
         ...current,
         { id: nextId.current++, role: "assistant", text: response.reply },
@@ -115,6 +127,14 @@ export function AiChat() {
     window.setTimeout(() => setCopied(false), 2000);
   }
 
+  function startNewConversation() {
+    if (busy) return;
+    setMessages([]);
+    setInput("");
+    setError("");
+    nextId.current = 1;
+  }
+
   return (
     <>
       <button
@@ -123,9 +143,9 @@ export function AiChat() {
         aria-haspopup="dialog"
         aria-expanded={open}
         title="Abrir assistente de IA"
-        className="fixed bottom-20 right-4 z-40 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[#534AB7]/60 bg-[#26215C] px-3 text-xs font-semibold text-[#FAC775] shadow-xl transition-colors hover:bg-[#534AB7] hover:text-white lg:bottom-6 lg:right-6"
+        className="fixed bottom-20 right-4 z-40 inline-flex min-h-11 items-center gap-2 rounded-full bg-brand-950 px-4 text-xs font-bold text-lime shadow-float transition hover:bg-brand-900 dark:bg-lime dark:text-brand-950 dark:hover:bg-lime-hover lg:bottom-6 lg:right-6"
       >
-        <span aria-hidden>✨</span>
+        <IconSparkles className="h-4 w-4" />
         <span className="hidden min-[380px]:inline">Assistente</span>
       </button>
 
@@ -135,38 +155,48 @@ export function AiChat() {
             type="button"
             aria-label="Fechar assistente"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/70"
+            className="absolute inset-0 bg-brand-950/40 backdrop-blur-sm dark:bg-black/70"
           />
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="ai-chat-title"
-            className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#26215C] shadow-2xl sm:max-h-[85dvh] sm:max-w-lg sm:rounded-3xl"
+            className="animate-fade-up relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-4xl border border-ink/[0.06] bg-paper shadow-float dark:border-white/10 sm:max-h-[85dvh] sm:max-w-lg sm:rounded-4xl"
           >
-            <header className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <header className="flex items-start justify-between gap-3 border-b border-ink/[0.06] px-4 py-3 dark:border-white/10">
               <div className="min-w-0">
-                <h2 id="ai-chat-title" className="text-base font-semibold text-white">
+                <h2 id="ai-chat-title" className="text-base font-extrabold text-ink">
                   Assistente IA
                 </h2>
-                <p className="text-[11px] text-zinc-400">
-                  Consultas somente leitura · nada é enviado sozinho
+                <p className="text-[11px] text-ink/70">
+                  Dados do CRM + web · somente leitura
                 </p>
+                {mode === "chat" && messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={startNewConversation}
+                    disabled={busy}
+                    className="mt-1 text-[11px] font-bold text-brand-700 underline-offset-2 hover:underline disabled:opacity-60 dark:text-brand-300"
+                  >
+                    Nova conversa
+                  </button>
+                )}
               </div>
               <button
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Fechar"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-zinc-300 hover:bg-white/10 hover:text-white"
+                className="icon-btn"
               >
-                ✕
+                <IconClose className="h-4 w-4" />
               </button>
             </header>
 
             <div
               role="tablist"
               aria-label="Modo do assistente"
-              className="flex gap-1 border-b border-white/10 px-3 py-2"
+              className="flex gap-1 border-b border-ink/[0.06] px-3 py-2 dark:border-white/10"
             >
               <button
                 type="button"
@@ -176,10 +206,10 @@ export function AiChat() {
                   setMode("chat");
                   setError("");
                 }}
-                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-semibold transition-colors ${
+                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-bold transition ${
                   mode === "chat"
-                    ? "bg-[#534AB7] text-white"
-                    : "text-zinc-300 hover:bg-white/5"
+                    ? "bg-brand-950 text-white dark:bg-lime dark:text-brand-950"
+                    : "text-ink/70 hover:bg-ink/5 dark:hover:bg-white/5"
                 }`}
               >
                 Consultar dados
@@ -192,10 +222,10 @@ export function AiChat() {
                   setMode("status");
                   setStatusError("");
                 }}
-                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-semibold transition-colors ${
+                className={`min-h-11 flex-1 rounded-full px-3 text-xs font-bold transition ${
                   mode === "status"
-                    ? "bg-[#534AB7] text-white"
-                    : "text-zinc-300 hover:bg-white/5"
+                    ? "bg-brand-950 text-white dark:bg-lime dark:text-brand-950"
+                    : "text-ink/70 hover:bg-ink/5 dark:hover:bg-white/5"
                 }`}
               >
                 Criar status
@@ -204,15 +234,14 @@ export function AiChat() {
 
             {mode === "chat" ? (
               <>
-                <div
-                  aria-live="polite"
-                  className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
-                >
+                <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                   {messages.length === 0 && !busy && (
                     <div className="space-y-3">
-                      <p className="text-sm text-zinc-300">
-                        Pergunte sobre vendas, atrasos ou status de um pedido. A IA
-                        consulta apenas os seus dados.
+                      <p className="text-sm leading-relaxed text-ink/70">
+                        Pergunte sobre clientes, vendas, cobranças, pagamentos,
+                        produtos ou relatórios. Também pode pedir uma pesquisa na
+                        web. A IA consulta os dados no seu escopo e não altera
+                        nada.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {SUGGESTIONS.map((suggestion) => (
@@ -220,7 +249,7 @@ export function AiChat() {
                             key={suggestion}
                             type="button"
                             onClick={() => setInput(suggestion)}
-                            className="min-h-11 rounded-full border border-white/10 bg-white/5 px-3 text-left text-xs text-zinc-200 hover:border-[#534AB7] hover:bg-[#534AB7]/20"
+                            className="min-h-11 rounded-full border border-ink/10 bg-white/60 px-3 text-left text-xs font-semibold text-ink/70 transition hover:border-brand-500 hover:bg-brand-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-brand-300/40 dark:hover:bg-brand-400/10"
                           >
                             {suggestion}
                           </button>
@@ -239,8 +268,8 @@ export function AiChat() {
                       <p
                         className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
                           message.role === "user"
-                            ? "bg-[#534AB7] text-white"
-                            : "bg-white/10 text-zinc-100"
+                            ? "bg-brand-950 text-white dark:bg-brand-100 dark:text-brand-950"
+                            : "bg-ink/5 text-ink dark:bg-white/10"
                         }`}
                       >
                         {message.text}
@@ -250,24 +279,21 @@ export function AiChat() {
 
                   {busy && (
                     <div className="flex justify-start">
-                      <p className="rounded-2xl bg-white/10 px-3 py-2 text-sm text-zinc-300">
-                        Consultando…
+                      <p className="rounded-2xl bg-ink/5 px-3 py-2 text-sm text-ink/70 dark:bg-white/10">
+                        Consultando dados e web…
                       </p>
                     </div>
                   )}
 
                   {error && (
-                    <div
-                      role="alert"
-                      className="rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-                    >
+                    <div role="alert" className={ERROR_BOX}>
                       {error}
                     </div>
                   )}
                   <div ref={endRef} />
                 </div>
 
-                <form onSubmit={sendMessage} className="border-t border-white/10 p-3">
+                <form onSubmit={sendMessage} className="border-t border-ink/[0.06] p-3 dark:border-white/10">
                   <div className="flex items-end gap-2">
                     <textarea
                       value={input}
@@ -283,31 +309,25 @@ export function AiChat() {
                       disabled={busy}
                       aria-label="Mensagem para o assistente"
                       placeholder="Ex.: quanto vendi em outubro?"
-                      className="min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40 disabled:opacity-60"
+                      className="field min-h-11 flex-1 resize-none disabled:opacity-60"
                     />
                     <button
                       type="submit"
                       disabled={busy || !input.trim()}
-                      className="min-h-11 shrink-0 rounded-full bg-[#534AB7] px-4 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+                      className="btn btn-primary btn-sm shrink-0"
                     >
                       {busy ? "…" : "Enviar"}
                     </button>
                   </div>
-                  <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
-                    A IA não altera dados. Confira os valores antes de usar.
+                  <p className="mt-1.5 text-[10px] leading-snug text-ink/70">
+                    A IA não altera dados. Confira valores e fontes antes de usar.
                   </p>
                 </form>
               </>
             ) : (
-              <form
-                onSubmit={generateStatus}
-                className="flex-1 space-y-3 overflow-y-auto p-4"
-              >
+              <form onSubmit={generateStatus} className="flex-1 space-y-3 overflow-y-auto p-4">
                 <div>
-                  <label
-                    htmlFor="ai-status-reason"
-                    className="mb-1 block text-sm font-medium text-zinc-200"
-                  >
+                  <label htmlFor="ai-status-reason" className="label">
                     Motivo do status *
                   </label>
                   <textarea
@@ -318,16 +338,13 @@ export function AiChat() {
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     placeholder="Ex.: o pedido 123 atrasou um dia"
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+                    className="field resize-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
                   <div>
-                    <label
-                      htmlFor="ai-status-client"
-                      className="mb-1 block text-sm font-medium text-zinc-200"
-                    >
+                    <label htmlFor="ai-status-client" className="label">
                       Cliente (opcional)
                     </label>
                     <input
@@ -337,14 +354,11 @@ export function AiChat() {
                       value={clientName}
                       onChange={(event) => setClientName(event.target.value)}
                       placeholder="Nome do cliente"
-                      className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+                      className="field"
                     />
                   </div>
                   <div>
-                    <label
-                      htmlFor="ai-status-order"
-                      className="mb-1 block text-sm font-medium text-zinc-200"
-                    >
+                    <label htmlFor="ai-status-order" className="label">
                       Pedido (opcional)
                     </label>
                     <input
@@ -354,7 +368,7 @@ export function AiChat() {
                       value={order}
                       onChange={(event) => setOrder(event.target.value)}
                       placeholder="Ex.: 123"
-                      className="min-h-11 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40"
+                      className="field"
                     />
                   </div>
                 </div>
@@ -362,36 +376,33 @@ export function AiChat() {
                 <button
                   type="submit"
                   disabled={statusBusy || !reason.trim()}
-                  className="min-h-11 w-full rounded-full bg-[#534AB7] px-4 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+                  className="btn btn-primary w-full"
                 >
                   {statusBusy ? "Gerando…" : "Gerar frase"}
                 </button>
 
                 {statusError && (
-                  <div
-                    role="alert"
-                    className="rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-                  >
+                  <div role="alert" className={ERROR_BOX}>
                     {statusError}
                   </div>
                 )}
 
                 {generated && (
-                  <div className="rounded-2xl border border-[#BA7517]/50 bg-[#BA7517]/15 p-3">
-                    <p className="whitespace-pre-wrap break-words text-sm text-[#FAC775]">
+                  <div className="rounded-2xl border border-brand-700/20 bg-brand-50 p-3 dark:border-brand-300/20 dark:bg-brand-400/15">
+                    <p className="whitespace-pre-wrap break-words text-sm text-brand-700 dark:text-brand-200">
                       {generated}
                     </p>
                     <button
                       type="button"
                       onClick={() => void copyGenerated()}
-                      className="mt-3 min-h-11 rounded-full border border-[#FAC775]/40 px-3 text-xs font-semibold text-[#FAC775] hover:bg-[#BA7517]/20"
+                      className="btn btn-ghost btn-sm mt-3"
                     >
                       {copied ? "Copiado!" : "Copiar texto"}
                     </button>
                   </div>
                 )}
 
-                <p className="text-[10px] leading-snug text-zinc-500">
+                <p className="text-[10px] leading-snug text-ink/70">
                   Revise antes de copiar. Nenhuma mensagem é enviada ou gravada
                   automaticamente.
                 </p>

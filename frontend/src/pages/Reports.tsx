@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { api, ApiError, downloadReportPdf } from "../lib/api.ts";
 import {
   cashflowReportDownload,
@@ -15,25 +15,32 @@ import {
   fmtMoney,
   todayISO,
 } from "../lib/format.ts";
+import { PageHeader } from "../components/PageHeader.tsx";
+import {
+  IconAlert,
+  IconBell,
+  IconCalendar,
+  IconDatabase,
+  IconReceipt,
+} from "../components/icons.tsx";
 import type { ClientReportRow, ProductReportRow, SalesReport } from "../types.ts";
 
-const CARD = "rounded-3xl bg-[#26215C] p-4 shadow-lg shadow-black/30 sm:p-5";
-const LABEL = "mb-1 block text-xs font-medium text-zinc-400";
-// `text-base` (16px) evita o zoom automático que o iOS aplica em inputs menores.
-const INPUT =
-  "w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-base text-white focus:border-[#534AB7] focus:outline-none sm:text-sm";
-// Alvo de toque de 44px no mobile (min-h-11) — o botão antigo tinha ~32px.
-const PRIMARY_BUTTON =
-  "min-h-11 w-full rounded-full bg-[#534AB7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50 sm:w-auto";
+const ERROR_BOX =
+  "rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200";
 
 type ExportKind = "period" | "paid" | "pending" | "charges" | "cashflow";
 
-const EXPORTS: { kind: ExportKind; label: string; hint: string; icon: string }[] = [
-  { kind: "period", label: "Vendas do período", hint: "pagas e pendentes do período", icon: "🗓️" },
-  { kind: "paid", label: "Vendas pagas", hint: "período das datas acima", icon: "💰" },
-  { kind: "pending", label: "Vendas pendentes", hint: "todas em aberto", icon: "⏳" },
-  { kind: "charges", label: "Cobranças", hint: "com situação de vencimento", icon: "🔔" },
-  { kind: "cashflow", label: "Fechamento de caixa", hint: "mês selecionado acima", icon: "📦" },
+const EXPORTS: {
+  kind: ExportKind;
+  label: string;
+  hint: string;
+  Icon: ComponentType<{ className?: string }>;
+}[] = [
+  { kind: "period", label: "Vendas do período", hint: "pagas e pendentes do período", Icon: IconCalendar },
+  { kind: "paid", label: "Vendas pagas", hint: "período das datas acima", Icon: IconReceipt },
+  { kind: "pending", label: "Vendas pendentes", hint: "todas em aberto", Icon: IconBell },
+  { kind: "charges", label: "Cobranças", hint: "com situação de vencimento", Icon: IconAlert },
+  { kind: "cashflow", label: "Fechamento de caixa", hint: "mês selecionado acima", Icon: IconDatabase },
 ];
 
 function buildDownload(
@@ -176,10 +183,10 @@ function StatusPill({ status }: { status: string }) {
   const paid = status === "paid";
   return (
     <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+      className={`chip ring-1 ring-inset ${
         paid
-          ? "bg-[#2E5E3A]/40 text-[#7FE0A0] ring-1 ring-[#2E5E3A]"
-          : "bg-[#BA7517]/30 text-[#FAC775] ring-1 ring-[#BA7517]/60"
+          ? "bg-brand-50 text-brand-700 ring-brand-700/15 dark:bg-brand-400/15 dark:text-brand-200 dark:ring-brand-300/20"
+          : "bg-amber-50 text-amber-700 ring-amber-700/15 dark:bg-amber-400/15 dark:text-amber-200 dark:ring-amber-300/20"
       }`}
     >
       {paid ? "Paga" : "Pendente"}
@@ -210,23 +217,23 @@ function Ranking({
   emptyText: string;
 }) {
   return (
-    <section className={`mt-4 sm:mt-6 ${CARD}`}>
-      <h2 className="mb-4 text-base font-semibold text-zinc-200">{title}</h2>
+    <section className="card mt-4 p-4 sm:mt-6 sm:p-6">
+      <h2 className="section-title mb-4">{title}</h2>
       {rows.length === 0 ? (
-        <p className="text-sm text-zinc-400">{emptyText}</p>
+        <p className="text-sm text-ink/70">{emptyText}</p>
       ) : (
         <>
           <ul className="space-y-2 sm:hidden">
             {rows.map((row) => (
               <li
                 key={row.key}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-3 py-2.5"
+                className="flex items-center justify-between gap-3 rounded-2xl bg-ink/[0.04] px-3 py-2.5 dark:bg-white/5"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm text-zinc-100">{row.name}</div>
-                  <div className="text-xs text-zinc-400">{row.meta}</div>
+                  <div className="truncate text-sm font-semibold text-ink">{row.name}</div>
+                  <div className="text-xs text-ink/70">{row.meta}</div>
                 </div>
-                <div className="shrink-0 text-sm font-semibold text-white">{row.value}</div>
+                <div className="money shrink-0 text-sm font-bold text-ink">{row.value}</div>
               </li>
             ))}
           </ul>
@@ -234,7 +241,7 @@ function Ranking({
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs uppercase text-zinc-400">
+                <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                   <th className="px-3 py-2">Nome</th>
                   <th className="px-3 py-2 text-right">{metaHeader}</th>
                   <th className="px-3 py-2 text-right">Faturado</th>
@@ -242,10 +249,10 @@ function Ranking({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.key} className="border-t border-white/5">
-                    <td className="px-3 py-2 text-zinc-200">{row.name}</td>
-                    <td className="px-3 py-2 text-right text-zinc-400">{row.meta}</td>
-                    <td className="px-3 py-2 text-right font-medium text-white">{row.value}</td>
+                  <tr key={row.key} className="border-t border-ink/[0.06] dark:border-white/10">
+                    <td className="px-3 py-2 font-medium text-ink">{row.name}</td>
+                    <td className="px-3 py-2 text-right text-ink/70">{row.meta}</td>
+                    <td className="money px-3 py-2 text-right font-bold text-ink">{row.value}</td>
                   </tr>
                 ))}
               </tbody>
@@ -297,28 +304,25 @@ function ReportsPage({
   const periodInvalid = Boolean(start && end && start > end);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-white">Relatórios</h1>
-      <p className="mb-4 mt-1 text-sm text-zinc-400">
-        Acompanhe os números do período e emita os relatórios em PDF (A4) para
-        imprimir ou enviar ao cliente.
-      </p>
+    <div className="animate-fade-up space-y-4 sm:space-y-6">
+      <PageHeader
+        title="Relatórios"
+        eyebrow="Análise"
+        subtitle="Acompanhe os números do período e emita os relatórios em PDF (A4) para imprimir ou enviar ao cliente."
+      />
 
       {error && (
-        <div
-          role="alert"
-          className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-        >
+        <div role="alert" className={ERROR_BOX}>
           {error}
         </div>
       )}
 
-      <section className={CARD}>
-        <h2 className="mb-4 text-base font-semibold text-zinc-200">Vendas por período</h2>
+      <section className="card card-pad">
+        <h2 className="section-title mb-4">Vendas por período</h2>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:items-end lg:gap-3">
           <div className="lg:w-44">
-            <label className={LABEL} htmlFor="reports-start">
+            <label className="label" htmlFor="reports-start">
               De
             </label>
             <input
@@ -326,11 +330,11 @@ function ReportsPage({
               type="date"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className={INPUT}
+              className="field"
             />
           </div>
           <div className="lg:w-44">
-            <label className={LABEL} htmlFor="reports-end">
+            <label className="label" htmlFor="reports-end">
               Até
             </label>
             <input
@@ -338,26 +342,26 @@ function ReportsPage({
               type="date"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className={INPUT}
+              className="field"
             />
           </div>
           <button
             type="button"
             onClick={onLoad}
             disabled={busy || exporting !== null || periodInvalid}
-            className={PRIMARY_BUTTON}
+            className="btn btn-primary lg:w-auto"
           >
             {exporting === "period" ? "Gerando PDF…" : busy ? "Gerando…" : "Gerar e baixar PDF"}
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-zinc-400">
+        <p className="hint mt-2">
           O botão “Gerar” filtra o período e baixa o PDF com todas as vendas
           (pagas e pendentes) das datas selecionadas.
         </p>
 
         {periodInvalid && (
-          <p className="mt-2 text-xs text-[#FAC775]">
+          <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
             A data inicial não pode ser maior que a data final.
           </p>
         )}
@@ -365,57 +369,71 @@ function ReportsPage({
         <p
           aria-live="polite"
           role="status"
-          className={`mt-2 text-xs ${pdfFeedback ? (pdfFeedback.ok ? "text-emerald-300" : "text-red-300") : "text-transparent"}`}
+          className={`mt-2 text-xs font-semibold ${
+            pdfFeedback
+              ? pdfFeedback.ok
+                ? "text-brand-700 dark:text-brand-300"
+                : "text-rose-600 dark:text-rose-300"
+              : "text-transparent"
+          }`}
         >
           {pdfFeedback?.text ?? "—"}
         </p>
 
-        {loading && !report && <p className="mt-4 text-sm text-zinc-400">Carregando…</p>}
+        {loading && !report && <p className="mt-4 text-sm text-ink/70">Carregando…</p>}
 
         {report && (
           <>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-              <div className="rounded-2xl bg-white/5 p-3">
-                <div className="text-[11px] uppercase text-zinc-400 sm:text-xs">Vendas</div>
-                <div className="text-lg font-bold break-words text-white sm:text-xl">
+              <div className="rounded-2xl bg-ink/[0.04] p-3 dark:bg-white/5">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 sm:text-xs">
+                  Vendas
+                </div>
+                <div className="money text-lg font-extrabold break-words text-ink sm:text-xl">
                   {report.sales_count}
                 </div>
               </div>
-              <div className="rounded-2xl bg-emerald-500/10 p-3">
-                <div className="text-[11px] uppercase text-emerald-300 sm:text-xs">Recebido</div>
-                <div className="text-lg font-bold break-words text-emerald-300 sm:text-xl">
+              <div className="rounded-2xl bg-brand-50 p-3 dark:bg-brand-400/15">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-brand-700 sm:text-xs dark:text-brand-200">
+                  Recebido
+                </div>
+                <div className="money text-lg font-extrabold break-words text-brand-700 sm:text-xl dark:text-brand-200">
                   {fmtMoney(report.paid_total)}
                 </div>
               </div>
-              <div className="rounded-2xl bg-[#BA7517]/20 p-3">
-                <div className="text-[11px] uppercase text-[#FAC775] sm:text-xs">Pendente</div>
-                <div className="text-lg font-bold break-words text-[#FAC775] sm:text-xl">
+              <div className="rounded-2xl bg-amber-50 p-3 dark:bg-amber-400/15">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-amber-700 sm:text-xs dark:text-amber-200">
+                  Pendente
+                </div>
+                <div className="money text-lg font-extrabold break-words text-amber-700 sm:text-xl dark:text-amber-200">
                   {fmtMoney(report.pending_total)}
                 </div>
               </div>
-              <div className="rounded-2xl bg-white/5 p-3">
-                <div className="text-[11px] uppercase text-zinc-400 sm:text-xs">Total</div>
-                <div className="text-lg font-bold break-words text-white sm:text-xl">
+              <div className="rounded-2xl bg-ink/[0.04] p-3 dark:bg-white/5">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 sm:text-xs">
+                  Total
+                </div>
+                <div className="money text-lg font-extrabold break-words text-ink sm:text-xl">
                   {fmtMoney(report.total)}
                 </div>
               </div>
             </div>
             {report.sales.length === 0 && (
-              <p className="mt-4 text-sm text-zinc-400">Nenhuma venda no período.</p>
+              <p className="mt-4 text-sm text-ink/70">Nenhuma venda no período.</p>
             )}
           </>
         )}
       </section>
 
-      <section className={`mt-4 sm:mt-6 ${CARD}`}>
-        <h2 className="text-base font-semibold text-zinc-200">Emitir relatório em PDF</h2>
-        <p className="mt-1 text-xs text-zinc-400">
+      <section className="card card-pad">
+        <h2 className="section-title">Emitir relatório em PDF</h2>
+        <p className="hint mt-1">
           Os arquivos são gerados na hora, em A4, com data de emissão, total e
           número de página no rodapé.
         </p>
 
         <div className="mt-4 sm:max-w-xs">
-          <label className={LABEL} htmlFor="reports-month">
+          <label className="label" htmlFor="reports-month">
             Mês do fechamento de caixa
           </label>
           <input
@@ -423,30 +441,30 @@ function ReportsPage({
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className={INPUT}
+            className="field"
           />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {EXPORTS.map((item) => {
-            const isExporting = exporting === item.kind;
+          {EXPORTS.map(({ kind, label, hint, Icon }) => {
+            const isExporting = exporting === kind;
             return (
               <button
-                key={item.kind}
+                key={kind}
                 type="button"
-                onClick={() => onExport(item.kind)}
+                onClick={() => onExport(kind)}
                 disabled={exporting !== null}
-                aria-label={`Baixar PDF: ${item.label}`}
-                className="flex min-h-14 w-full flex-col items-start justify-center gap-0.5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:border-[#534AB7] hover:bg-[#534AB7]/20 disabled:opacity-50"
+                aria-label={`Baixar PDF: ${label}`}
+                className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-ink/10 bg-white/60 px-4 py-3 text-left transition hover:border-brand-500 hover:bg-brand-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-brand-300/40 dark:hover:bg-brand-400/10"
               >
-                <span className="text-sm font-semibold text-white">
-                  <span aria-hidden className="mr-1.5">
-                    {item.icon}
-                  </span>
-                  {item.label}
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-400/15 dark:text-brand-200">
+                  <Icon className="h-4 w-4" />
                 </span>
-                <span className="text-[11px] text-zinc-400">
-                  {isExporting ? "Gerando PDF…" : item.hint}
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-ink">{label}</span>
+                  <span className="block text-[11px] text-ink/70">
+                    {isExporting ? "Gerando PDF…" : hint}
+                  </span>
                 </span>
               </button>
             );
@@ -456,31 +474,40 @@ function ReportsPage({
         <p
           aria-live="polite"
           role="status"
-          className={`mt-3 text-xs ${pdfFeedback ? (pdfFeedback.ok ? "text-emerald-300" : "text-red-300") : "text-transparent"}`}
+          className={`mt-3 text-xs font-semibold ${
+            pdfFeedback
+              ? pdfFeedback.ok
+                ? "text-brand-700 dark:text-brand-300"
+                : "text-rose-600 dark:text-rose-300"
+              : "text-transparent"
+          }`}
         >
           {pdfFeedback?.text ?? "—"}
         </p>
       </section>
 
       {report && report.sales.length > 0 && (
-        <section className={`mt-4 sm:mt-6 ${CARD}`}>
-          <h2 className="mb-4 text-base font-semibold text-zinc-200">Vendas do período</h2>
+        <section className="card card-pad">
+          <h2 className="section-title mb-4">Vendas do período</h2>
 
           {/* Mobile: cartões — a tabela de 5 colunas não cabe em 360px */}
           <ul className="space-y-2 sm:hidden">
             {report.sales.map((sale) => (
-              <li key={sale.id} className="rounded-2xl bg-white/5 px-3 py-2.5">
+              <li
+                key={sale.id}
+                className="rounded-2xl bg-ink/[0.04] px-3 py-2.5 dark:bg-white/5"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white">
+                    <div className="truncate text-sm font-bold text-ink">
                       {sale.client_name}
                     </div>
-                    <div className="text-xs text-zinc-400">
+                    <div className="text-xs text-ink/70">
                       #{sale.id} · {fmtDate(sale.sale_date)}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-bold text-white">{fmtMoney(sale.total)}</span>
+                    <span className="money text-sm font-bold text-ink">{fmtMoney(sale.total)}</span>
                     <StatusPill status={sale.status} />
                   </div>
                 </div>
@@ -491,7 +518,7 @@ function ReportsPage({
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs uppercase text-zinc-400">
+                <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                   <th className="px-3 py-2">#</th>
                   <th className="px-3 py-2">Cliente</th>
                   <th className="px-3 py-2">Data</th>
@@ -501,11 +528,11 @@ function ReportsPage({
               </thead>
               <tbody>
                 {report.sales.map((sale) => (
-                  <tr key={sale.id} className="border-t border-white/5">
-                    <td className="px-3 py-2 text-zinc-400">#{sale.id}</td>
-                    <td className="px-3 py-2 text-zinc-200">{sale.client_name}</td>
-                    <td className="px-3 py-2 text-zinc-400">{fmtDate(sale.sale_date)}</td>
-                    <td className="px-3 py-2 text-right font-medium text-white">
+                  <tr key={sale.id} className="border-t border-ink/[0.06] dark:border-white/10">
+                    <td className="px-3 py-2 text-ink/70">#{sale.id}</td>
+                    <td className="px-3 py-2 font-medium text-ink">{sale.client_name}</td>
+                    <td className="px-3 py-2 text-ink/70">{fmtDate(sale.sale_date)}</td>
+                    <td className="money px-3 py-2 text-right font-bold text-ink">
                       {fmtMoney(sale.total)}
                     </td>
                     <td className="px-3 py-2">

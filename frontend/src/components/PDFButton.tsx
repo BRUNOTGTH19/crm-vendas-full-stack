@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IconDownload } from "./icons.tsx";
 
 interface PDFButtonProps {
   /** Função que dispara o download e lança ApiError em caso de falha. */
@@ -7,7 +8,7 @@ interface PDFButtonProps {
   disabled?: boolean;
 }
 
-/** Botão pílula roxo para exportação em PDF (doc 3.1 e 3.4). */
+/** Botão de exportação em PDF (estado "Gerando…" preservado). */
 export function PDFButton({ onDownload, label = "PDF", disabled }: PDFButtonProps) {
   const [busy, setBusy] = useState(false);
 
@@ -23,8 +24,9 @@ export function PDFButton({ onDownload, label = "PDF", disabled }: PDFButtonProp
           setBusy(false);
         }
       }}
-      className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#534AB7] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+      className="btn btn-ghost btn-sm"
     >
+      <IconDownload className="h-4 w-4" />
       {busy ? "Gerando…" : label}
     </button>
   );

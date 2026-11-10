@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal.tsx";
 import { fmtMoney, fmtDate } from "../lib/format.ts";
+import { IconAlert, IconCheck } from "./icons.tsx";
 import {
   ApiError,
   copyToClipboard,
@@ -98,83 +99,98 @@ export function CollectionModal({ sale, clientName, onClose }: CollectionModalPr
 
   return (
     <Modal title={`Cobrar — Venda #${sale.id}`} onClose={onClose}>
-      <div className="mb-3 grid grid-cols-3 gap-3 text-sm">
-        <div>
-          <div className="text-xs uppercase text-zinc-400">Cliente</div>
-          <div className="truncate font-semibold text-white">{clientName}</div>
+      <div className="mb-3 grid grid-cols-3 gap-2 text-sm">
+        <div className="rounded-2xl bg-ink/[0.04] p-3 dark:bg-white/5">
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-ink/70">
+            Cliente
+          </div>
+          <div className="mt-0.5 truncate font-bold text-ink">{clientName}</div>
         </div>
-        <div>
-          <div className="text-xs uppercase text-zinc-400">Saldo</div>
-          <div className="font-semibold text-[#FAC775]">{fmtMoney(sale.remaining)}</div>
+        <div className="rounded-2xl bg-amber-50 p-3 dark:bg-amber-400/15">
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-200">
+            Saldo
+          </div>
+          <div className="money mt-0.5 font-bold text-amber-700 dark:text-amber-200">
+            {fmtMoney(sale.remaining)}
+          </div>
         </div>
-        <div>
-          <div className="text-xs uppercase text-zinc-400">Vencimento</div>
-          <div className="font-semibold text-white">{fmtDate(sale.due_date)}</div>
+        <div className="rounded-2xl bg-ink/[0.04] p-3 dark:bg-white/5">
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-ink/70">
+            Vencimento
+          </div>
+          <div className="mt-0.5 font-bold text-ink">{fmtDate(sale.due_date)}</div>
         </div>
       </div>
 
-      <label className="mb-1 block text-sm font-medium text-zinc-300">
-        Mensagem de cobrança <span className="text-zinc-500">(editável)</span>
+      <label className="label" htmlFor="collection-message">
+        Mensagem de cobrança
       </label>
       <textarea
+        id="collection-message"
         rows={9}
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         disabled={loading}
-        className="w-full resize-y rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none focus:ring-2 focus:ring-[#534AB7]/40 disabled:opacity-50"
+        className="field resize-y leading-relaxed"
       />
 
       {!hasPhone && !loading && (
-        <p className="mt-2 rounded-xl border border-[#FAC775]/40 bg-[#FAC775]/10 px-3 py-2 text-xs text-[#FAC775]">
-          Este cliente ainda não tem WhatsApp cadastrado. Edite o cliente em{" "}
-          <span className="font-semibold">Clientes</span> para habilitar o envio
-          automático. Você ainda pode copiar a mensagem.
+        <p className="mt-2 flex items-start gap-2 rounded-xl border border-amber-700/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-300/20 dark:bg-amber-400/15 dark:text-amber-200">
+          <IconAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Este cliente ainda não tem WhatsApp cadastrado. Edite o cliente em{" "}
+            <span className="font-bold">Clientes</span> para habilitar o envio automático.
+            Você ainda pode copiar a mensagem.
+          </span>
         </p>
       )}
 
-      <p className="mt-2 text-xs text-zinc-400">
-        💡 O WhatsApp não permite anexar arquivos por link. O PDF do recibo é
-        baixado automaticamente — anexe-o na conversa após abrir o WhatsApp.
+      <p className="hint mt-2">
+        O WhatsApp não permite anexar arquivos por link. O PDF do recibo é baixado
+        automaticamente — anexe-o na conversa após abrir o WhatsApp.
       </p>
 
       {pdfState === "working" && (
-        <p className="mt-2 text-xs text-zinc-400">⏳ Gerando o PDF do recibo…</p>
+        <p className="mt-2 text-xs text-ink/70">Gerando o PDF do recibo…</p>
       )}
       {pdfState === "done" && (
-        <p className="mt-2 text-xs font-semibold text-emerald-300">
-          ✅ PDF baixado! Anexe-o na conversa do WhatsApp.
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-300">
+          <IconCheck className="h-3.5 w-3.5" />
+          PDF baixado! Anexe-o na conversa do WhatsApp.
         </p>
       )}
 
       {error && (
-        <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <p
+          role="alert"
+          className="mt-3 rounded-xl border border-rose-700/20 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+        >
           {error}
         </p>
       )}
 
       <div className="mt-5 flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={copy}
-          disabled={loading}
-          className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
-        >
+        <button type="button" onClick={copy} disabled={loading} className="btn btn-ghost">
           {copied ? "Copiado ✓" : "Copiar"}
         </button>
         <button
           type="button"
           onClick={downloadPdf}
           disabled={pdfState === "working"}
-          className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+          className="btn btn-primary"
         >
-          {pdfState === "working" ? "Gerando…" : pdfState === "done" ? "Baixar novamente" : "Baixar PDF"}
+          {pdfState === "working"
+            ? "Gerando…"
+            : pdfState === "done"
+              ? "Baixar novamente"
+              : "Baixar PDF"}
         </button>
         <button
           type="button"
           onClick={openWhatsapp}
           disabled={!hasPhone || loading}
           title={hasPhone ? "Abrir WhatsApp com a mensagem pronta" : "Cliente sem WhatsApp"}
-          className="min-h-11 rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+          className="btn btn-lime"
         >
           Abrir WhatsApp
         </button>

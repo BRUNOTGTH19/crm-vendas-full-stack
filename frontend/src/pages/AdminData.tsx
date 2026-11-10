@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../components/Modal.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
+import {
+  IconAlert,
+  IconCheck,
+  IconDatabase,
+  IconDownload,
+  IconTrash,
+  IconUpload,
+} from "../components/icons.tsx";
 import {
   ApiError,
   adminCreateResetToken,
@@ -156,30 +165,38 @@ export function AdminData() {
   }
 
   return (
-    <div>
-      <h1 className="mb-2 text-2xl font-bold text-white">Gestão de dados</h1>
-      <p className="mb-6 text-sm text-zinc-400">
-        Área restrita a administradores. O reset apaga as tabelas de dados
-        (clientes, vendas, itens, pagamentos e inscrições de push) e{" "}
-        <span className="font-semibold text-[#FAC775]">preserva os usuários</span>.
-      </p>
+    <div className="animate-fade-up space-y-4 sm:space-y-6">
+      <PageHeader
+        title="Gestão de dados"
+        eyebrow="Administração"
+        subtitle="Área restrita a administradores. O reset apaga as tabelas de dados (clientes, vendas, itens, pagamentos e inscrições de push) e preserva os usuários."
+      />
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+        >
           {error}
         </div>
       )}
       {ok && (
-        <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div
+          role="status"
+          className="rounded-2xl border border-brand-700/20 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/15 dark:text-brand-200"
+        >
           {ok}
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Reset */}
-        <section className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-          <h2 className="text-lg font-semibold text-white">Zerar dados</h2>
-          <p className="mt-1 text-xs text-zinc-400">
+        <section className="card card-pad flex min-w-0 flex-col">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-400/15 dark:text-rose-200">
+            <IconTrash className="h-5 w-5" />
+          </span>
+          <h2 className="section-title mt-3">Zerar dados</h2>
+          <p className="hint mt-1 flex-1">
             Apaga todos os registros de dados do ambiente de teste. Ação
             irreversível — exporte antes se quiser guardar.
           </p>
@@ -187,46 +204,52 @@ export function AdminData() {
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={busy}
-            className="min-h-11 mt-4 w-full rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+            className="btn btn-danger mt-4 w-full"
           >
             Zerar dados
           </button>
         </section>
 
         {/* Export */}
-        <section className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-          <h2 className="text-lg font-semibold text-white">Exportar</h2>
-          <p className="mt-1 text-xs text-zinc-400">
+        <section className="card card-pad flex min-w-0 flex-col">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-400/15 dark:text-brand-200">
+            <IconDownload className="h-5 w-5" />
+          </span>
+          <h2 className="section-title mt-3">Exportar</h2>
+          <p className="hint mt-1 flex-1">
             Baixa um arquivo JSON com todos os registros das tabelas de dados.
           </p>
           <button
             type="button"
             onClick={doExport}
             disabled={busy}
-            className="min-h-11 mt-4 w-full rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+            className="btn btn-primary mt-4 w-full"
           >
             Exportar dados
           </button>
         </section>
 
         {/* Import */}
-        <section className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-          <h2 className="text-lg font-semibold text-white">Importar</h2>
-          <p className="mt-1 text-xs text-zinc-400">
+        <section className="card card-pad flex min-w-0 flex-col">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200">
+            <IconUpload className="h-5 w-5" />
+          </span>
+          <h2 className="section-title mt-3">Importar</h2>
+          <p className="hint mt-1 flex-1">
             Reinsere os dados de um arquivo exportado anteriormente.
           </p>
           <input
             ref={fileRef}
             type="file"
             accept="application/json,.json"
-            className="mt-3 min-h-11 w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2 text-xs text-zinc-300 file:mr-3 file:rounded-full file:border-0 file:bg-[#534AB7] file:px-3 file:py-1.5 file:text-xs file:text-white"
+            className="field mt-3 text-xs file:mr-3 file:rounded-full file:border-0 file:bg-brand-950 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white dark:file:bg-lime dark:file:text-brand-950"
           />
-          <label className="mt-3 flex items-center gap-2 text-xs text-zinc-300">
+          <label className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-ink/70">
             <span>Conflitos de ID:</span>
             <select
               value={importMode}
               onChange={(e) => setImportMode(e.target.value as "skip" | "overwrite")}
-              className="min-h-11 rounded-lg border border-white/10 bg-[#1A1A1A] px-2 py-1 text-xs text-white focus:border-[#534AB7] focus:outline-none"
+              className="field min-w-0 flex-1 py-1.5 text-xs sm:flex-none"
             >
               <option value="skip">Pular existentes (skip)</option>
               <option value="overwrite">Sobrescrever (overwrite)</option>
@@ -236,7 +259,7 @@ export function AdminData() {
             type="button"
             onClick={doImport}
             disabled={busy}
-            className="min-h-11 mt-3 w-full rounded-full bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="btn btn-lime mt-3 w-full"
           >
             Importar dados
           </button>
@@ -244,11 +267,11 @@ export function AdminData() {
       </div>
 
       {/* Usuários */}
-      <section className="mt-4 rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <section className="card card-pad">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold text-white">Usuários</h2>
-            <p className="mt-1 text-xs text-zinc-400">
+            <h2 className="section-title">Usuários</h2>
+            <p className="hint mt-1 max-w-2xl">
               Excluir um usuário comum remove também os clientes, vendas,
               pagamentos e inscrições de push dele. Administradores são
               protegidos e não podem ser excluídos.
@@ -258,7 +281,7 @@ export function AdminData() {
             type="button"
             onClick={() => void loadUsers()}
             disabled={usersBusy}
-            className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="btn btn-ghost btn-sm"
           >
             {usersBusy ? "Carregando…" : "Atualizar lista"}
           </button>
@@ -267,22 +290,22 @@ export function AdminData() {
           {users.map((u) => (
             <li
               key={u.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#1A1A1A] px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/[0.06] bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/5"
             >
-              <div>
-                <div className="text-sm font-semibold text-white">
-                  {u.name}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+                  <span className="truncate">{u.name}</span>
                   <span
-                    className={
+                    className={`chip uppercase ${
                       u.role === "admin"
-                        ? "ml-2 rounded-full bg-[#FAC775]/20 px-2 py-0.5 text-[10px] font-semibold uppercase text-[#FAC775]"
-                        : "ml-2 rounded-full bg-[#534AB7]/30 px-2 py-0.5 text-[10px] font-semibold uppercase text-[#B7B0F0]"
-                    }
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200"
+                        : "bg-brand-50 text-brand-700 dark:bg-brand-400/15 dark:text-brand-200"
+                    }`}
                   >
                     {u.role}
                   </span>
                 </div>
-                <div className="text-xs text-zinc-400">{u.email}</div>
+                <div className="truncate text-xs text-ink/70">{u.email}</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {u.id !== me?.id ? (
@@ -290,21 +313,21 @@ export function AdminData() {
                     type="button"
                     onClick={() => void doGenerateResetToken(u)}
                     disabled={tokenBusy}
-                    className="min-h-11 rounded-full bg-[#534AB7] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
+                    className="btn btn-primary btn-sm"
                   >
                     {tokenBusy && tokenUser?.id === u.id
                       ? "Gerando…"
                       : "Gerar token de redefinição"}
                   </button>
                 ) : (
-                  <span className="text-xs text-zinc-500">você</span>
+                  <span className="text-xs font-semibold text-ink/70">você</span>
                 )}
                 {u.role === "user" && (
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(u)}
                     disabled={busy}
-                    className="min-h-11 rounded-full bg-red-500/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                    className="btn btn-danger btn-sm"
                   >
                     Excluir
                   </button>
@@ -313,7 +336,7 @@ export function AdminData() {
             </li>
           ))}
           {!usersBusy && users.length === 0 && (
-            <li className="rounded-2xl border border-white/10 bg-[#1A1A1A] px-4 py-3 text-xs text-zinc-400">
+            <li className="rounded-2xl border border-ink/[0.06] bg-white/60 px-4 py-3 text-xs text-ink/70 dark:border-white/10 dark:bg-white/5">
               Nenhum usuário encontrado.
             </li>
           )}
@@ -321,27 +344,31 @@ export function AdminData() {
       </section>
 
       {resetResult && (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-[#26215C] p-4 text-sm">
-          <div className="mb-1 font-semibold text-white">Último reset</div>
-          <ul className="space-y-0.5 text-zinc-300">
+        <div className="card p-4 text-sm">
+          <div className="mb-1 flex items-center gap-2 font-bold text-ink">
+            <IconDatabase className="h-4 w-4" />
+            Último reset
+          </div>
+          <ul className="space-y-0.5 text-ink/70">
             {Object.entries(resetResult.cleared).map(([table, count]) => (
               <li key={table}>
                 {table}: {count} registro(s) removido(s)
               </li>
             ))}
           </ul>
-          <div className="mt-1 text-xs text-zinc-400">
+          <div className="mt-1 text-xs text-ink/70">
             Preservadas: {resetResult.preserved.join(", ")}
           </div>
         </div>
       )}
 
       {importResult && (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-[#26215C] p-4 text-sm">
-          <div className="mb-1 font-semibold text-white">
+        <div className="card p-4 text-sm">
+          <div className="mb-1 flex items-center gap-2 font-bold text-ink">
+            <IconCheck className="h-4 w-4" />
             Última importação (modo: {importResult.mode})
           </div>
-          <ul className="space-y-0.5 text-zinc-300">
+          <ul className="space-y-0.5 text-ink/70">
             {Object.keys(importResult.inserted).map((table) => (
               <li key={table}>
                 {table}: {importResult.inserted[table]} inserido(s),{" "}
@@ -355,26 +382,30 @@ export function AdminData() {
 
       {confirmOpen && (
         <Modal title="Confirmar reset de dados" onClose={() => setConfirmOpen(false)}>
-          <p className="text-sm text-zinc-300">
-            Tem certeza que deseja <span className="font-semibold text-red-300">zerar todos os dados</span>?
-            Clientes, vendas, itens, pagamentos e inscrições de push serão apagados.
-            Os usuários <span className="font-semibold text-white">não</span> serão removidos.
-          </p>
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-400/15 dark:text-rose-200">
+              <IconAlert className="h-5 w-5" />
+            </span>
+            <p className="text-sm leading-relaxed text-ink/70">
+              Tem certeza que deseja{" "}
+              <span className="font-bold text-rose-600 dark:text-rose-300">
+                zerar todos os dados
+              </span>
+              ? Clientes, vendas, itens, pagamentos e inscrições de push serão
+              apagados. Os usuários <span className="font-bold text-ink">não</span> serão
+              removidos.
+            </p>
+          </div>
           <div className="mt-5 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setConfirmOpen(false)}
               disabled={busy}
-              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+              className="btn btn-ghost"
             >
               Cancelar
             </button>
-            <button
-              type="button"
-              onClick={doReset}
-              disabled={busy}
-              className="min-h-11 rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
-            >
+            <button type="button" onClick={doReset} disabled={busy} className="btn btn-danger">
               {busy ? "Zerando…" : "Confirmar e zerar"}
             </button>
           </div>
@@ -383,38 +414,34 @@ export function AdminData() {
 
       {tokenUser && (
         <Modal title="Token de redefinição de senha" onClose={closeTokenModal}>
-          <p className="text-sm text-zinc-300">
+          <p className="text-sm text-ink/70">
             Token para{" "}
-            <span className="font-semibold text-white">{tokenUser.name}</span> (
-            {tokenUser.email}). Entregue o token pessoalmente ao usuário.
+            <span className="font-bold text-ink">{tokenUser.name}</span> ({tokenUser.email}).
+            Entregue o token pessoalmente ao usuário.
           </p>
 
           {tokenBusy && (
-            <p className="mt-4 rounded-2xl bg-[#1A1A1A] px-4 py-3 text-sm text-zinc-300">
+            <p className="mt-4 rounded-2xl bg-ink/[0.04] px-4 py-3 text-sm text-ink/70 dark:bg-white/5">
               Gerando token…
             </p>
           )}
 
           {resetToken && (
             <>
-              <div className="mt-4 break-all rounded-2xl border border-[#534AB7]/40 bg-[#1A1A1A] px-4 py-3 font-mono text-xs leading-relaxed text-[#FAC775]">
+              <div className="mt-4 break-all rounded-2xl border border-brand-700/20 bg-brand-50 px-4 py-3 font-mono text-xs leading-relaxed text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/15 dark:text-brand-200">
                 {resetToken.token}
               </div>
-              <p className="mt-2 text-xs text-[#FAC775]">
+              <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
                 Expira em 15 minutos e não será exibido novamente. Copie agora.
               </p>
               <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeTokenModal}
-                  className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5"
-                >
+                <button type="button" onClick={closeTokenModal} className="btn btn-ghost">
                   Fechar
                 </button>
                 <button
                   type="button"
                   onClick={() => void copyResetToken()}
-                  className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4]"
+                  className="btn btn-primary"
                 >
                   {tokenCopied ? "Copiado ✓" : "Copiar token"}
                 </button>
@@ -431,19 +458,20 @@ export function AdminData() {
             if (!busy) setDeleteTarget(null);
           }}
         >
-          <p className="text-sm text-zinc-300">
-            Excluir{" "}
-            <span className="font-semibold text-white">{deleteTarget.name}</span> (
+          <p className="text-sm leading-relaxed text-ink/70">
+            Excluir <span className="font-bold text-ink">{deleteTarget.name}</span> (
             {deleteTarget.email})? Todos os dados dele serão apagados: clientes,
             vendas, itens, pagamentos e inscrições de push.{" "}
-            <span className="font-semibold text-red-300">Esta ação não tem volta.</span>
+            <span className="font-bold text-rose-600 dark:text-rose-300">
+              Esta ação não tem volta.
+            </span>
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setDeleteTarget(null)}
               disabled={busy}
-              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+              className="btn btn-ghost"
             >
               Cancelar
             </button>
@@ -451,7 +479,7 @@ export function AdminData() {
               type="button"
               onClick={doDeleteUser}
               disabled={busy}
-              className="min-h-11 rounded-full bg-red-500/90 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              className="btn btn-danger"
             >
               {busy ? "Excluindo…" : "Confirmar exclusão"}
             </button>

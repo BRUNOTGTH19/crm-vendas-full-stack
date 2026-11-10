@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api.ts";
 import { fmtMoney, todayISO } from "../lib/format.ts";
+import { PageHeader } from "../components/PageHeader.tsx";
+import { IconClose, IconPlus } from "../components/icons.tsx";
 import type { Client, SaleInput, SaleStatus } from "../types.ts";
 
 type ItemRow = { key: number; product_name: string; quantity: string; unit_price: string };
@@ -146,80 +148,88 @@ function NewSalePage(props: {
   } = props;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Nova venda</h1>
-        <a
-          href="#/sales"
-          className="inline-flex min-h-11 items-center px-1 text-sm text-[#FAC775] hover:underline"
-        >
-          ← Voltar para vendas
-        </a>
-      </div>
+    <div className="animate-fade-up space-y-5">
+      <PageHeader
+        title="Nova venda"
+        eyebrow="Vendas"
+        subtitle="Registre o cliente, as datas e os itens. O total é calculado em tempo real."
+        actions={
+          <a href="#/sales" className="btn btn-ghost btn-sm">
+            Voltar para vendas
+          </a>
+        }
+      />
 
       {ok ? (
-        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6">
-          <p className="font-medium text-emerald-300">
+        <div className="card card-pad border-brand-700/20 bg-brand-50 dark:border-brand-300/20 dark:bg-brand-400/10">
+          <p className="font-bold text-brand-700 dark:text-brand-200">
             Venda registrada com sucesso.
           </p>
-          <a
-            href="#/sales"
-            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-[#534AB7] px-4 py-2 text-sm font-medium text-white hover:bg-[#6a60d4]"
-          >
+          <a href="#/sales" className="btn btn-primary mt-4">
             Ver vendas
           </a>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={onSubmit} className="space-y-5">
+          <div className="card card-pad grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-300">Cliente</label>
+              <label className="label" htmlFor="sale-client">
+                Cliente
+              </label>
               <select
+                id="sale-client"
                 required
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                className="field"
               >
-                <option value="" className="bg-[#1A1A1A]">Selecionar…</option>
+                <option value="">Selecionar…</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={String(c.id)} className="bg-[#1A1A1A]">
+                  <option key={c.id} value={String(c.id)}>
                     {c.full_name}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-300">Data da venda</label>
+              <label className="label" htmlFor="sale-date">
+                Data da venda
+              </label>
               <input
+                id="sale-date"
                 type="date"
                 required
                 value={saleDate}
                 onChange={(e) => setSaleDate(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                className="field"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-300">Status</label>
+              <label className="label" htmlFor="sale-status">
+                Status
+              </label>
               <select
+                id="sale-status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as SaleStatus)}
-                className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                className="field"
               >
-                <option value="pending" className="bg-[#1A1A1A]">Pendente (a cobrar)</option>
-                <option value="paid" className="bg-[#1A1A1A]">Paga</option>
+                <option value="pending">Pendente (a cobrar)</option>
+                <option value="paid">Paga</option>
               </select>
             </div>
             {status === "pending" && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-300">
+                <label className="label" htmlFor="sale-due-date">
                   Vencimento (obrigatório)
                 </label>
                 <input
+                  id="sale-due-date"
                   type="date"
                   required
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[#26215C] px-3 py-2.5 text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                  className="field"
                 />
               </div>
             )}
@@ -229,17 +239,19 @@ function NewSalePage(props: {
               disponível e text-base (evita zoom automático no iOS). */}
           <div className="space-y-3 sm:hidden">
             {items.map((it) => (
-              <div key={it.key} className="rounded-3xl bg-[#26215C] p-4 shadow-lg shadow-black/30">
+              <div key={it.key} className="card p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs uppercase text-zinc-400">Produto</span>
+                  <span className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70">
+                    Produto
+                  </span>
                   <button
                     type="button"
                     onClick={() => onRemoveItem(it.key)}
                     disabled={items.length === 1}
-                    className="flex h-11 w-11 items-center justify-center rounded-full text-lg leading-none text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+                    className="icon-btn text-rose-600 hover:border-rose-300 hover:text-rose-700 dark:text-rose-300"
                     aria-label="Remover linha"
                   >
-                    ×
+                    <IconClose className="h-4 w-4" />
                   </button>
                 </div>
                 <input
@@ -247,22 +259,22 @@ function NewSalePage(props: {
                   value={it.product_name}
                   onChange={(e) => onUpdateItem(it.key, { product_name: e.target.value })}
                   placeholder="Nome do produto"
-                  className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-base text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
+                  className="field"
                 />
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs uppercase text-zinc-400">Qtd.</label>
+                    <label className="label">Qtd.</label>
                     <input
                       type="number"
                       min={1}
                       step={1}
                       value={it.quantity}
                       onChange={(e) => onUpdateItem(it.key, { quantity: e.target.value })}
-                      className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-right text-base text-white focus:border-[#534AB7] focus:outline-none"
+                      className="field text-right"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs uppercase text-zinc-400">P. unit. (R$)</label>
+                    <label className="label">P. unit. (R$)</label>
                     <input
                       type="number"
                       min={0}
@@ -270,13 +282,13 @@ function NewSalePage(props: {
                       value={it.unit_price}
                       onChange={(e) => onUpdateItem(it.key, { unit_price: e.target.value })}
                       placeholder="0.00"
-                      className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-3 py-2.5 text-right text-base text-white focus:border-[#534AB7] focus:outline-none"
+                      className="field text-right"
                     />
                   </div>
                 </div>
                 <div className="mt-3 text-right text-sm">
-                  <span className="text-zinc-400">Subtotal: </span>
-                  <span className="font-medium text-[#FAC775]">
+                  <span className="text-ink/70">Subtotal: </span>
+                  <span className="money font-bold text-brand-700 dark:text-brand-300">
                     {fmtMoney(toNum(it.quantity) * toNum(it.unit_price))}
                   </span>
                 </div>
@@ -285,27 +297,27 @@ function NewSalePage(props: {
           </div>
 
           {/* Desktop/tablet: tabela com overflow horizontal seguro. */}
-          <div className="hidden overflow-x-auto rounded-3xl bg-[#26215C] shadow-lg shadow-black/30 sm:block">
+          <div className="card hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-zinc-400 uppercase border-b border-white/10">
+                <tr className="border-b border-ink/[0.06] text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70 dark:border-white/10">
                   <th className="px-3 py-2.5">Produto</th>
-                  <th className="px-3 py-2.5 w-24 text-right">Qtd.</th>
-                  <th className="px-3 py-2.5 w-32 text-right">P. unit. (R$)</th>
+                  <th className="w-24 px-3 py-2.5 text-right">Qtd.</th>
+                  <th className="w-32 px-3 py-2.5 text-right">P. unit. (R$)</th>
                   <th className="px-3 py-2.5 text-right">Subtotal</th>
-                  <th className="px-3 py-2.5 w-16"></th>
+                  <th className="w-16 px-3 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it) => (
-                  <tr key={it.key} className="border-t border-white/5">
+                  <tr key={it.key} className="border-t border-ink/[0.06] dark:border-white/10">
                     <td className="px-3 py-2">
                       <input
                         type="text"
                         value={it.product_name}
                         onChange={(e) => onUpdateItem(it.key, { product_name: e.target.value })}
                         placeholder="Nome do produto"
-                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:border-[#534AB7] focus:outline-none"
+                        className="field px-2 py-1.5"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -315,7 +327,7 @@ function NewSalePage(props: {
                         step={1}
                         value={it.quantity}
                         onChange={(e) => onUpdateItem(it.key, { quantity: e.target.value })}
-                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                        className="field px-2 py-1.5 text-right"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -326,10 +338,10 @@ function NewSalePage(props: {
                         value={it.unit_price}
                         onChange={(e) => onUpdateItem(it.key, { unit_price: e.target.value })}
                         placeholder="0.00"
-                        className="w-full min-w-0 rounded-xl border border-white/10 bg-[#1A1A1A] px-2 py-1.5 text-right text-sm text-white focus:border-[#534AB7] focus:outline-none"
+                        className="field px-2 py-1.5 text-right"
                       />
                     </td>
-                    <td className="px-3 py-2 text-right font-medium text-[#FAC775]">
+                    <td className="money px-3 py-2 text-right font-bold text-brand-700 dark:text-brand-300">
                       {fmtMoney(toNum(it.quantity) * toNum(it.unit_price))}
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -337,10 +349,10 @@ function NewSalePage(props: {
                         type="button"
                         onClick={() => onRemoveItem(it.key)}
                         disabled={items.length === 1}
-                        className="flex h-11 w-11 items-center justify-center rounded-full text-lg leading-none text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+                        className="icon-btn mx-auto text-rose-600 hover:border-rose-300 hover:text-rose-700 dark:text-rose-300"
                         aria-label="Remover linha"
                       >
-                        ×
+                        <IconClose className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
@@ -350,37 +362,32 @@ function NewSalePage(props: {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              onClick={onAddItem}
-              className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5"
-            >
-              + Adicionar produto
+            <button type="button" onClick={onAddItem} className="btn btn-ghost btn-sm">
+              <IconPlus className="h-4 w-4" />
+              Adicionar produto
             </button>
-            <div className="ml-auto text-right">
-              <div className="text-xs text-zinc-400 uppercase">Total</div>
-              <div className="text-2xl font-bold text-[#FAC775]">{fmtMoney(total)}</div>
+            <div className="ml-auto rounded-2xl bg-brand-950 px-4 py-3 text-right text-white shadow-card dark:bg-lime dark:text-brand-950">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] opacity-70">
+                Total
+              </div>
+              <div className="money text-2xl font-extrabold">{fmtMoney(total)}</div>
             </div>
           </div>
 
           {error && (
-            <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            <div
+              role="alert"
+              className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+            >
               {error}
             </div>
           )}
 
           <div className="flex justify-end gap-3">
-            <a
-              href="#/sales"
-              className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
-            >
+            <a href="#/sales" className="btn btn-ghost">
               Cancelar
             </a>
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#534AB7] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy} className="btn btn-primary">
               {busy ? "Salvando…" : "Registrar venda"}
             </button>
           </div>

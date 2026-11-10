@@ -12,23 +12,26 @@ import {
 } from "recharts";
 import { api, ApiError } from "../lib/api.ts";
 import { fmtDate, fmtMoney } from "../lib/format.ts";
+import {
+  CHART_AXIS,
+  CHART_PAID,
+  CHART_PENDING,
+  CHART_SERIES,
+  CHART_TOOLTIP_STYLE,
+} from "../lib/chart-colors.ts";
 import { StatusBadge } from "../components/StatusBadge.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
 import type { Dashboard as DashboardData } from "../types.ts";
 
-const CARD_COLORS = ["#534AB7", "#BA7517", "#7A6FD0", "#FAC775", "#4A4370"];
-
-const TOOLTIP_STYLE = {
-  background: "#1A1A1A",
-  border: "1px solid #534AB7",
-  borderRadius: 12,
-  color: "#fff",
-};
-
-function Card({ label, value, accent }: { label: string; value: string; accent: string }) {
+function KpiCard({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-      <div className={`text-xs font-semibold uppercase tracking-wide ${accent}`}>{label}</div>
-      <div className="mt-2 text-3xl font-bold text-white">{value}</div>
+    <div className="card p-4 sm:p-5">
+      <div className={`text-[11px] font-extrabold uppercase tracking-[0.16em] ${tone}`}>
+        {label}
+      </div>
+      <div className="money mt-2 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+        {value}
+      </div>
     </div>
   );
 }
@@ -65,64 +68,99 @@ export function Dashboard() {
     data?.top_products.map((p) => ({ name: p.product_name, total: p.total_revenue })) ?? [];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Painel</h1>
-        <button
-          onClick={load}
-          disabled={busy}
-          className="min-h-11 rounded-full bg-[#534AB7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6a60d4] disabled:opacity-50"
-        >
-          {busy ? "Carregando…" : "Atualizar"}
-        </button>
-      </div>
+    <div className="animate-fade-up space-y-6">
+      <PageHeader
+        title="Painel"
+        eyebrow="Visão geral"
+        subtitle="Acompanhe clientes, vendas e o que está pendente de cobrança."
+        actions={
+          <button onClick={load} disabled={busy} className="btn btn-primary btn-sm">
+            {busy ? "Carregando…" : "Atualizar"}
+          </button>
+        }
+      />
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div
+          role="alert"
+          className="rounded-2xl border border-rose-700/20 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-400/15 dark:text-rose-200"
+        >
           {error}
         </div>
       )}
 
-      {!data && busy && <div className="text-sm text-zinc-400">Carregando métricas…</div>}
+      {!data && busy && <div className="skeleton h-28 w-full" />}
 
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-            <Card label="Clientes" value={String(data.total_clients)} accent="text-[#7A6FD0]" />
-            <Card label="Vendas" value={String(data.total_sales)} accent="text-[#7A6FD0]" />
-            <Card label="Recebido" value={fmtMoney(data.revenue_paid)} accent="text-emerald-300" />
-            <Card label="Pendente" value={fmtMoney(data.revenue_pending)} accent="text-[#FAC775]" />
-            <Card label="Vencidas" value={String(data.overdue_count)} accent="text-red-400" />
-            <Card label="Mês atual" value={fmtMoney(data.revenue_month)} accent="text-[#7A6FD0]" />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <KpiCard
+              label="Clientes"
+              value={String(data.total_clients)}
+              tone="text-brand-700 dark:text-brand-300"
+            />
+            <KpiCard
+              label="Vendas"
+              value={String(data.total_sales)}
+              tone="text-brand-700 dark:text-brand-300"
+            />
+            <KpiCard
+              label="Recebido"
+              value={fmtMoney(data.revenue_paid)}
+              tone="text-brand-700 dark:text-brand-300"
+            />
+            <KpiCard
+              label="Pendente"
+              value={fmtMoney(data.revenue_pending)}
+              tone="text-amber-700 dark:text-amber-300"
+            />
+            <KpiCard
+              label="Vencidas"
+              value={String(data.overdue_count)}
+              tone="text-rose-700 dark:text-rose-300"
+            />
+            <KpiCard
+              label="Mês atual"
+              value={fmtMoney(data.revenue_month)}
+              tone="text-sky-700 dark:text-sky-300"
+            />
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-2">
             {/*DASH_STEP2*/}
-            <div className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-              <h2 className="mb-3 text-sm font-semibold text-zinc-200">
-                Últimas vendas ({data.pending_count} pendentes)
+            <div className="card min-w-0 p-5 sm:p-6">
+              <h2 className="section-title">
+                Últimas vendas{" "}
+                <span className="text-sm font-bold text-ink/70">
+                  ({data.pending_count} pendentes)
+                </span>
               </h2>
               {data.recent_sales.length === 0 ? (
-                <p className="text-sm text-zinc-400">Nenhuma venda registrada ainda.</p>
+                <p className="mt-3 text-sm text-ink/70">Nenhuma venda registrada ainda.</p>
               ) : (
                 // Tabela com rolagem horizontal: em telas estreitas as 4 colunas
                 // não cabem e a página inteira não deve rolar de lado.
-                <div className="overflow-x-auto">
+                <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs uppercase text-zinc-400">
-                        <th className="pb-2">Cliente</th>
-                        <th className="pb-2">Data</th>
-                        <th className="pb-2">Total</th>
+                      <tr className="text-left text-[11px] font-extrabold uppercase tracking-[0.12em] text-ink/70">
+                        <th className="pb-2 pr-4">Cliente</th>
+                        <th className="pb-2 pr-4">Data</th>
+                        <th className="pb-2 pr-4">Total</th>
                         <th className="pb-2">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.recent_sales.map((s) => (
-                        <tr key={s.id} className="border-t border-white/5">
-                          <td className="py-2.5 text-zinc-100">{s.client_name}</td>
-                          <td className="py-2.5 text-zinc-400">{fmtDate(s.sale_date)}</td>
-                          <td className="py-2.5 font-semibold text-white">{fmtMoney(s.total)}</td>
+                        <tr
+                          key={s.id}
+                          className="border-t border-ink/[0.06] dark:border-white/10"
+                        >
+                          <td className="py-2.5 pr-4 font-semibold text-ink">{s.client_name}</td>
+                          <td className="py-2.5 pr-4 text-ink/70">{fmtDate(s.sale_date)}</td>
+                          <td className="money py-2.5 pr-4 font-bold text-ink">
+                            {fmtMoney(s.total)}
+                          </td>
                           <td className="py-2.5">
                             <StatusBadge status={s.status} />
                           </td>
@@ -134,13 +172,13 @@ export function Dashboard() {
               )}
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-                <h2 className="mb-3 text-sm font-semibold text-zinc-200">Recebido vs. pendente</h2>
+            <div className="grid min-w-0 gap-6 sm:grid-cols-2">
+              <div className="card min-w-0 p-5 sm:p-6">
+                <h2 className="section-title">Recebido vs. pendente</h2>
                 {pieData.length === 0 ? (
-                  <p className="text-sm text-zinc-400">Sem dados ainda.</p>
+                  <p className="mt-3 text-sm text-ink/70">Sem dados ainda.</p>
                 ) : (
-                  <div className="h-48">
+                  <div className="mt-2 h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -152,22 +190,25 @@ export function Dashboard() {
                           paddingAngle={3}
                         >
                           {pieData.map((entry, i) => (
-                            <Cell key={entry.name} fill={i === 0 ? "#7A6FD0" : "#FAC775"} />
+                            <Cell key={entry.name} fill={i === 0 ? CHART_PAID : CHART_PENDING} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v) => fmtMoney(Number(v))} contentStyle={TOOLTIP_STYLE} />
+                        <Tooltip
+                          formatter={(v) => fmtMoney(Number(v))}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                 )}
               </div>
 
-              <div className="rounded-3xl bg-[#26215C] p-5 shadow-lg shadow-black/30">
-                <h2 className="mb-3 text-sm font-semibold text-zinc-200">Produtos mais vendidos</h2>
+              <div className="card min-w-0 p-5 sm:p-6">
+                <h2 className="section-title">Produtos mais vendidos</h2>
                 {barData.length === 0 ? (
-                  <p className="text-sm text-zinc-400">Sem dados ainda.</p>
+                  <p className="mt-3 text-sm text-ink/70">Sem dados ainda.</p>
                 ) : (
-                  <div className="h-48">
+                  <div className="mt-2 h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={barData} layout="vertical" margin={{ left: 8 }}>
                         <XAxis type="number" hide />
@@ -175,12 +216,15 @@ export function Dashboard() {
                           type="category"
                           dataKey="name"
                           width={80}
-                          tick={{ fill: "#d4d2e0", fontSize: 10 }}
+                          tick={{ fill: CHART_AXIS, fontSize: 10 }}
                         />
-                        <Tooltip formatter={(v) => fmtMoney(Number(v))} contentStyle={TOOLTIP_STYLE} />
+                        <Tooltip
+                          formatter={(v) => fmtMoney(Number(v))}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                        />
                         <Bar dataKey="total" radius={[0, 8, 8, 0]}>
                           {barData.map((_, i) => (
-                            <Cell key={i} fill={CARD_COLORS[i % CARD_COLORS.length]} />
+                            <Cell key={i} fill={CHART_SERIES[i % CHART_SERIES.length]} />
                           ))}
                         </Bar>
                       </BarChart>
