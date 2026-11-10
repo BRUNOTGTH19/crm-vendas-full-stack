@@ -231,9 +231,12 @@ Há dois caminhos para liberar a área administrativa:
 
 O código gerado é **de uso único**: após a ativação ele é apagado e a ativação
 por código fica encerrada, então ninguém mais consegue usá-lo. Se preferir
-escolher o código, defina `ADMIN_SETUP_CODE` no Render (a variável substitui o
-código gerado). O endpoint é `POST /auth/activate-admin` `{ "code": "..." }`,
-autenticado e com rate limit por IP.
+escolher o código, defina `ADMIN_SETUP_CODE` no Render. Nesse caso a variável é
+uma **chave mestra**: vale a qualquer momento, inclusive se já existir um
+administrador (serve para recuperar o acesso). Trate esse valor como senha —
+quem souber a chave consegue ativar o admin. O endpoint é
+`POST /auth/activate-admin` `{ "code": "..." }`, autenticado e com rate limit
+por IP.
 
 **2. E-mail fixo (`ADMIN_EMAIL`)**
 
