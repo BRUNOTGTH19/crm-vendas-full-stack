@@ -16,9 +16,24 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # Habilita o reset de dados (POST /admin/database/reset).
-    # Opt-out: ligado por padrão para não travar o administrador. Defina
-    # ALLOW_DATABASE_RESET=false no .env para desabilitar a ação.
-    allow_database_reset: bool = True
+    # Opt-in: DESLIGADO por padrão. Em produção, só ligue
+    # ALLOW_DATABASE_RESET=true durante a operação de zerar os dados e desligue
+    # em seguida. Um admin comprometido não consegue apagar a base sem isso.
+    allow_database_reset: bool = False
+
+    # Redefinição "simples" de senha (POST /auth/reset-password): basta o e-mail
+    # cadastrado + a nova senha. É um vetor de tomada de conta (A1 da auditoria),
+    # por isso vem DESLIGADA. O fluxo seguro por token continua disponível em
+    # /auth/reset-password/confirm e o admin gera o token na área de gestão.
+    allow_legacy_password_reset: bool = False
+
+    # Custo do bcrypt. 11 mantém boa margem de segurança e responde ~2x mais
+    # rápido que o padrão 12 do passlib (que dominava o tempo do login).
+    bcrypt_rounds: int = Field(default=11, ge=10, le=14)
+
+    # Cota de mensagens do assistente de IA por usuário/hora (A3 da auditoria).
+    # Cada mensagem pode gerar várias chamadas ao provedor; 0 desabilita a IA.
+    ai_max_messages_per_hour: int = Field(default=30, ge=0, le=1000)
 
     # Origens permitidas no CORS, separadas por vírgula. "*" libera todas
     # (adequado para um app público sem cookies). Nunca combine "*" com
