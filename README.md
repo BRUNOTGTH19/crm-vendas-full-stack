@@ -60,37 +60,50 @@ o modal com a mensagem editável, **Copiar**, **Baixar PDF** e **Abrir WhatsApp*
 O botão flutuante **Assistente** aparece em todas as telas logadas (inclusive no
 celular) e abre um painel com dois modos:
 
-- **Consultar dados** — a IA escolhe uma das ferramentas fixas, o backend executa
-  a consulta com SQLAlchemy e devolve a resposta em linguagem natural;
+- **Consultar dados** — a IA conversa com contexto, escolhe uma das ferramentas
+  fixas de leitura do CRM ou pesquisa na internet e devolve a resposta em
+  linguagem natural. O histórico recente (até 12 mensagens) é enviado pelo
+  frontend para manter o fio da conversa;
 - **Criar status** — gera uma frase curta para o usuário revisar e copiar.
 
 Endpoints (ambos exigem `Authorization: Bearer <JWT>`):
 
 | Endpoint | O quê |
 | --- | --- |
-| `POST /ai/chat` | Chat com function calling. Corpo: `{"message": "..."}`. |
+| `POST /ai/chat` | Chat com function calling. Corpo: `{"message": "...", "history": [{"role": "user", "content": "..."}]}` (histórico opcional, só `user`/`assistant`, máx. 12). |
 | `POST /ai/status-message` | Frase de status. Corpo: `{"motivo": "...", "cliente": "...", "pedido": "..."}`. |
 
 Ferramentas disponíveis, todas **somente leitura**:
 
-- `get_sales_summary(inicio, fim)` — totais agregados do usuário logado;
-- `list_overdue()` — cobranças vencidas, sem telefone/e-mail/nome do cliente;
-- `get_sale_status(sale_id)` — status de uma venda do próprio usuário.
+- CRM: `get_sales_summary`, `list_overdue`, `get_sale_status`, `search_clients`,
+  `get_client_details`, `list_sales`, `get_sale_details` (itens e pagamentos),
+  `list_payments`, `top_products`, `client_ranking`, `global_search` e
+  `get_my_profile`;
+- Administração (somente admin): `list_users` e `get_user_summary`;
+- Web: `web_search` e `fetch_url` (texto de páginas públicas).
 
-Regras de segurança implementadas:
+Regras de segurança e escopo:
 
-- o `user_id` vem **sempre do JWT**, nunca dos argumentos do modelo. Os schemas
-  das tools usam `extra="forbid"`; enviar `user_id` é rejeitado;
-- argumentos são validados com Pydantic (datas ISO, intervalo de até 366 dias,
-  `sale_id` inteiro positivo);
-- no máximo **3 rodadas** de tool calls e **3 tools** por requisição;
-- cache Redis por `(user_id, ferramenta, parâmetros)` para leituras repetidas;
+- o escopo vem de `resolve_data_owner`: usuário comum acessa **apenas** os
+  próprios dados; administrador acessa o escopo global por padrão ou um usuário
+  específico via `X-View-User`. O `user_id` nunca vem dos argumentos do modelo;
+- os schemas das tools usam `extra="forbid"`; enviar `user_id`/`owner_id` é
+  rejeitado (exceto o argumento explícito de `get_user_summary`, que só existe
+  para admin);
+- argumentos são validados com Pydantic (datas ISO, intervalos, IDs positivos);
+- no máximo **4 rodadas** de tool calls e **6 tools** por requisição;
+- cache Redis por `(escopo, ferramenta, parâmetros)`; a chave separa usuário e
+  visão global para nunca reutilizar dados de outro dono;
 - HTTP 429 do provedor free tier vira **429** com mensagem amigável; ausência de
   configuração vira **503** genérico (sem revelar variável ou valor);
-- prompts, respostas e chave **não são registrados em log**;
+- prompts, respostas, consultas web e chave **não são registrados em log**;
 - CPF/CNPJ, e-mail, telefone e sequências longas de dígitos são redigidos da
   entrada antes do envio; a saída é renderizada como texto (sem HTML);
-- a IA não cria, altera ou exclui registros e não gera SQL livre.
+- a IA não cria, altera ou exclui registros e não gera SQL livre;
+- `fetch_url` só aceita `http/https`, bloqueia IPs privados/loopback/metadata e
+  revalida cada redirecionamento (proteção SSRF), com limite de tamanho e tempo;
+- resultados da web são conteúdo não confiável: o prompt manda ignorar
+  instruções vindas deles e citar as URLs usadas.
 
 Configuração no **Render → Environment** (Web Service do backend):
 
@@ -99,6 +112,7 @@ Configuração no **Render → Environment** (Web Service do backend):
 | `AI_API_URL` | URL **completa** do endpoint OpenAI-compatível, ex.: `https://api.groq.com/openai/v1/chat/completions` |
 | `AI_API_KEY` | chave do provedor (Groq/Gemini). Nunca versionar |
 | `AI_MODEL` | modelo disponível no provedor, ex.: `llama-3.1-8b-instant` |
+| `TAVILY_API_KEY` | **opcional**; melhora a busca web. Sem ela, usa o fallback gratuito DuckDuckGo HTML |
 
 Para Gemini, use o endpoint OpenAI-compatível
 `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` e um
