@@ -57,7 +57,7 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
       <div
         role="group"
         aria-label="Tema da interface"
-        className={`inline-flex items-center gap-1 rounded-full border border-ink/10 bg-white/60 p-1 dark:border-white/10 dark:bg-white/5 ${className}`}
+        className={`flex w-full items-center gap-1 rounded-full border border-ink/10 bg-white/60 p-1 dark:border-white/10 dark:bg-white/5 ${className}`}
       >
         {OPTIONS.map(({ value, label, Icon }) => {
           const active = preference === value;
@@ -67,14 +67,14 @@ export function ThemeToggle({ variant = "icon", className = "" }: ThemeTogglePro
               type="button"
               aria-pressed={active}
               onClick={() => choose(value)}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+              className={`inline-flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-full px-1.5 py-1.5 text-[11px] font-bold transition ${
                 active
                   ? "bg-brand-950 text-white shadow-sm dark:bg-lime dark:text-brand-950"
                   : "text-ink/70 hover:text-ink"
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{label}</span>
             </button>
           );
         })}
