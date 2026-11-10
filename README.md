@@ -215,20 +215,41 @@ Toda ação é registrada na tabela de auditoria `audit_logs` (quem, quando, o q
 ### Como virar admin
 
 O cadastro público cria **sempre** usuário comum (`role="user"`); o campo `role`
-do `POST /auth/register` só aceita esse valor (enviar `admin` retorna 422). Para
-liberar a área administrativa:
+do `POST /auth/register` só aceita esse valor (enviar `admin` retorna 422).
+
+Há dois caminhos para liberar a área administrativa:
+
+**1. Código de ativação (mais simples, sem SQL)**
+
+1. cadastre e entre normalmente na sua conta;
+2. o backend gera um código aleatório na primeira vez que o app é aberto sem
+   existir administrador e o registra **apenas no log do servidor**
+   (`admin_setup_code_generated ...`). No Render, veja **Logs**; localmente, o
+   terminal do backend;
+3. no app, clique em **Ativar acesso admin** (sidebar ou ícone no topo), cole o
+   código e confirme. A partir daí a área administrativa é liberada.
+
+O código gerado é **de uso único**: após a ativação ele é apagado e a ativação
+por código fica encerrada, então ninguém mais consegue usá-lo. Se preferir
+escolher o código, defina `ADMIN_SETUP_CODE` no Render (a variável substitui o
+código gerado). O endpoint é `POST /auth/activate-admin` `{ "code": "..." }`,
+autenticado e com rate limit por IP.
+
+**2. E-mail fixo (`ADMIN_EMAIL`)**
 
 1. cadastre normalmente a conta na tela de login;
 2. no **Render → Environment**, defina `ADMIN_EMAIL` com o e-mail dessa conta;
-3. faça login novamente (ou apenas recarregue o app, que revalida via
-   `GET /auth/me`). A promoção é idempotente e não cria conta nenhuma.
+3. faça login novamente (ou recarregue o app, que revalida via `GET /auth/me`).
+   A promoção é idempotente e não cria conta nenhuma.
 
 A área aparece na sidebar como **Administração → Dados e usuários** e também na
-barra inferior do celular. Sem `ADMIN_EMAIL`, ninguém é promovido.
+barra inferior do celular.
 
-Testes: `python -m pytest tests/test_admin.py tests/test_admin_users.py`
-(autorização, reset com/sem confirmação, exportação, importação skip/overwrite,
-auditoria, rejeição de `role=admin` no cadastro e bootstrap por `ADMIN_EMAIL`).
+Testes: `python -m pytest tests/test_admin.py tests/test_admin_users.py
+tests/test_admin_activation.py` (autorização, reset com/sem confirmação,
+exportação, importação skip/overwrite, auditoria, rejeição de `role=admin` no
+cadastro, bootstrap por `ADMIN_EMAIL`, código gerado/definido, uso único e rate
+limit).
 
 
 # Deploy (100% gratuito, sem cartão)
@@ -273,8 +294,11 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
    - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
    - `ENVIRONMENT=production`
    - **(opcional)** `ADMIN_EMAIL=voce@exemplo.com` — promove essa conta já
-     cadastrada a administrador no login/revalidação. Sem ela, ninguém tem acesso
-     à área admin (o cadastro público nunca cria admin).
+     cadastrada a administrador no login/revalidação. O cadastro público nunca
+     cria admin.
+   - **(opcional)** `ADMIN_SETUP_CODE=segredo-forte` — código digitado em
+     **Ativar acesso admin** para virar admin sem depender do e-mail. Se vazio,
+     o backend gera um código de uso único e o mostra no log do servidor.
    - **(opcional)** `ALLOW_DATABASE_RESET=true` — habilita o botão "Zerar dados"
      no painel admin. O padrão já é `true`; use `false` para bloquear totalmente.
    - **(opcional)** `CORS_ALLOW_ORIGINS=*` — origens permitidas (separadas por
