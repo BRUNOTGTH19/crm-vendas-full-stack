@@ -15,10 +15,12 @@ export function TotalDisplay({ quantity, unitPrice, total }: TotalDisplayProps) 
 
   return (
     <div className="text-right">
-      <div className="text-xs text-zinc-400">
+      <div className="text-xs text-ink/70">
         {qTxt} × R$ {pTxt}
       </div>
-      <div className="text-xl font-bold text-[#FAC775]">{fmtMoney(total)}</div>
+      <div className="money text-xl font-extrabold text-brand-700 dark:text-brand-300">
+        {fmtMoney(total)}
+      </div>
     </div>
   );
 }

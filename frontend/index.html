@@ -3,10 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="CRM de vendas e cobranças — clientes, vendas, cobranças, relatórios e assistente de IA."
+    />
     <title>CRM PWA de Vendas</title>
     <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#26215C" />
+    <meta name="theme-color" content="#F5F2EA" />
+    <script>
+      // Anti-flash: aplica o tema salvo antes do React montar (chave `crm:theme`).
+      (function () {
+        try {
+          var stored = localStorage.getItem("crm:theme");
+          var pref =
+            stored === "dark" || stored === "light" || stored === "system" ? stored : "light";
+          var dark =
+            pref === "dark" ||
+            (pref === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var root = document.documentElement;
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? "#08100C" : "#F5F2EA");
+        } catch (error) {
+          /* storage indisponível: segue o padrão claro */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

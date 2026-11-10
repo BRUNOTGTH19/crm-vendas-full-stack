@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0f172a"/>
-  <circle cx="256" cy="256" r="168" fill="none" stroke="#38bdf8" stroke-width="28"/>
-  <text x="256" y="316" font-family="Arial, sans-serif" font-size="240" font-weight="bold" fill="#38bdf8" text-anchor="middle" dominant-baseline="middle">C</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="CRM Vendas">
+  <rect width="512" height="512" rx="112" fill="#0B2117"/>
+  <rect x="22" y="22" width="468" height="468" rx="92" fill="none" stroke="#D8F36B" stroke-opacity="0.16" stroke-width="3"/>
+  <path d="M132 352 224 262 296 314 392 186" fill="none" stroke="#D8F36B" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M330 186h62v62" fill="none" stroke="#D8F36B" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

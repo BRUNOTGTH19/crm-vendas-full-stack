@@ -1,10 +1,103 @@
 @import "tailwindcss";
 
-/* Tema escuro — doc oficial 3.4: dark mode com roxo (#26215C/#534AB7)
-   e âmbar (#FAC775/#BA7517) como cores de destaque. */
+/* ===========================================================================
+   Design system do CRM — tokens extraidos da referencia `financas`
+   ---------------------------------------------------------------------------
+   Tokens documentados em docs/design-tokens-financas.md.
+   Tailwind v4: os tokens vivem em @theme (nao existe tailwind.config.js).
+   O tema escuro e opt-in pela classe `.dark` no <html> (chave `crm:theme`).
+   =========================================================================== */
+
+/* Estrategia de dark mode por classe. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Cores semanticas: viram variaveis CSS para inverter no tema escuro. */
 :root {
-  color-scheme: dark;
+  --crm-cream: #f5f2ea;
+  --crm-paper: #fcfbf7;
+  --crm-ink: #14211a;
+  color-scheme: light;
+
+  /* Cores dos graficos (Recharts le estas variaveis via JS). */
+  --chart-1: #348f57;
+  --chart-2: #b45309;
+  --chart-3: #1e5b39;
+  --chart-4: #0369a1;
+  --chart-5: #be123c;
+  --chart-axis: #5c645d;
+  --chart-tooltip-bg: #fcfbf7;
+  --chart-tooltip-border: rgba(20, 33, 26, 0.14);
+  --chart-tooltip-text: #14211a;
 }
+
+.dark {
+  --crm-cream: #08100c;
+  --crm-paper: #101c15;
+  --crm-ink: #e8f1ea;
+  color-scheme: dark;
+
+  --chart-1: #57b176;
+  --chart-2: #fbbf24;
+  --chart-3: #8dce9f;
+  --chart-4: #7dd3fc;
+  --chart-5: #fda4af;
+  --chart-axis: #b8c9bd;
+  --chart-tooltip-bg: #101c15;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.16);
+  --chart-tooltip-text: #e8f1ea;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+
+  /* Superficies e texto (dinamicos: acompanham .dark) */
+  --color-cream: var(--crm-cream);
+  --color-paper: var(--crm-paper);
+  --color-ink: var(--crm-ink);
+
+  /* Escala da marca (verde) */
+  --color-brand-50: #f1f8f2;
+  --color-brand-100: #dcf0e2;
+  --color-brand-200: #bce3c6;
+  --color-brand-300: #8dce9f;
+  --color-brand-400: #57b176;
+  --color-brand-500: #348f57;
+  --color-brand-600: #247345;
+  --color-brand-700: #1e5b39;
+  --color-brand-800: #1a4930;
+  --color-brand-900: #163c29;
+  --color-brand-950: #0b2117;
+
+  /* Destaque */
+  --color-lime: #d8f36b;
+  --color-lime-hover: #c9eb52;
+
+  /* Raios */
+  --radius-4xl: 2rem;
+
+  /* Sombras */
+  --shadow-card: 0 1px 2px rgba(20, 33, 26, 0.04), 0 12px 32px -20px rgba(20, 33, 26, 0.28);
+  --shadow-float: 0 24px 60px -30px rgba(11, 33, 23, 0.55);
+
+  /* Movimento */
+  --animate-fade-up: fade-up 0.35s ease-out both;
+
+  @keyframes fade-up {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
 
 html,
 body {
@@ -12,20 +105,133 @@ body {
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background-color: #1a1a1a;
-  color: #f3f2f7;
+  font-family: var(--font-sans);
+  background-color: var(--crm-cream);
+  color: var(--crm-ink);
+  background-image:
+    radial-gradient(circle at 12% -10%, rgba(216, 243, 107, 0.35), transparent 34rem),
+    radial-gradient(circle at 92% 4%, rgba(52, 143, 87, 0.1), transparent 26rem);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(circle at 12% -10%, rgba(216, 243, 107, 0.09), transparent 34rem),
+    radial-gradient(circle at 92% 4%, rgba(52, 143, 87, 0.2), transparent 26rem);
+}
+
+/* Indicador de foco visivel e consistente (3.5:1 sobre cream). */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-lime);
+  color: var(--color-brand-950);
 }
 
 /* ---------------------------------------------------------------------------
-   Ajustes para uso no celular (PWA)
+   Componentes base (contratos visuais da referencia)
+   --------------------------------------------------------------------------- */
+
+@layer components {
+  .card {
+    @apply rounded-3xl border border-ink/[0.06] bg-paper shadow-card dark:border-white/[0.08] dark:shadow-none;
+  }
+
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-brand-950 text-white hover:bg-brand-900 dark:bg-brand-100 dark:text-brand-950 dark:hover:bg-brand-200;
+  }
+
+  .btn-lime {
+    @apply bg-lime text-brand-950 hover:bg-lime-hover;
+  }
+
+  .btn-ghost {
+    @apply border border-ink/10 bg-white/60 text-ink hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10;
+  }
+
+  .btn-danger {
+    @apply bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-200 dark:hover:bg-rose-950;
+  }
+
+  .btn-sm {
+    @apply min-h-11 px-3.5 py-2 text-xs sm:min-h-9;
+  }
+
+  .icon-btn {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-white/70 text-ink/70 transition hover:border-ink/20 hover:text-ink dark:border-white/10 dark:bg-white/5 dark:text-ink/70 dark:hover:border-white/20 dark:hover:text-ink sm:h-9 sm:w-9;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-bold uppercase tracking-[0.12em] text-ink/70;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-sm font-semibold text-ink transition placeholder:font-normal placeholder:text-ink/60 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-ink dark:placeholder:text-ink/50;
+  }
+
+  .hint {
+    @apply text-xs leading-relaxed text-ink/70;
+  }
+
+  .error-text {
+    @apply mt-1.5 text-xs font-semibold text-rose-600 dark:text-rose-300;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-extrabold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300;
+  }
+
+  .section-title {
+    @apply text-lg font-extrabold tracking-tight text-ink;
+  }
+
+  .money {
+    @apply tabular-nums;
+  }
+
+  .link-underline {
+    @apply font-bold text-brand-700 underline decoration-brand-300 decoration-2 underline-offset-4 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-xl bg-ink/5 dark:bg-white/10;
+  }
+
+  .page-title {
+    @apply text-3xl font-extrabold tracking-[-0.03em] text-ink sm:text-4xl;
+  }
+
+  .page-subtitle {
+    @apply text-sm leading-relaxed text-ink/70 sm:text-[15px];
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Ajustes para uso no celular (PWA) — preservados da versao anterior
    ---------------------------------------------------------------------------
    Este bloco fica FORA de @layer, por isso tem prioridade sobre as utilities
    do Tailwind v4 (que vivem em @layer utilities) — sem precisar !important. */
 
-/* Safari/iOS aplica zoom automático ao focar campos com fonte menor que 16px.
-   Os formulários usam `text-sm` (14px) no desktop e passam a 16px até 640px
-   (mesma fronteira do breakpoint `sm`, como já é feito em Reports.tsx). */
+/* Safari/iOS aplica zoom automatico ao focar campos com fonte menor que 16px.
+   Os formularios usam `text-sm` (14px) no desktop e passam a 16px ate 640px
+   (mesma fronteira do breakpoint `sm`, como ja e feito em Reports.tsx). */
 @media (max-width: 639px) {
   input:not([type="checkbox"]):not([type="radio"]),
   select,
@@ -34,9 +240,9 @@ body {
   }
 }
 
-/* 100vh considera a barra de endereço do navegador mobile, empurrando o
-   conteúdo e criando rolagem extra. dvh usa a altura realmente visível; em
-   navegadores antigos a declaração é ignorada e o 100vh continua valendo. */
+/* 100vh considera a barra de endereco do navegador mobile, empurrando o
+   conteudo e criando rolagem extra. dvh usa a altura realmente visivel; em
+   navegadores antigos a declaracao e ignorada e o 100vh continua valendo. */
 @supports (min-height: 100dvh) {
   .min-h-screen {
     min-height: 100dvh;
@@ -44,9 +250,9 @@ body {
 }
 
 /* Toque em controles: no celular o toque espera ~300 ms pelo duplo toque (zoom)
-   antes de disparar o clique, e o próprio duplo toque aplica zoom na página.
+   antes de disparar o clique, e o proprio duplo toque aplica zoom na pagina.
    `touch-action: manipulation` remove os dois atrasos sem bloquear o zoom por
-   pinça, que é requisito de acessibilidade. */
+   pinca, que e requisito de acessibilidade. */
 button,
 [role="button"],
 a,
@@ -55,4 +261,28 @@ input,
 select,
 textarea {
   touch-action: manipulation;
+}
+
+/* Safe areas para PWA instalado (notch / home indicator). */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ---------------------------------------------------------------------------
+   Movimento reduzido — respeita prefers-reduced-motion do sistema
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
