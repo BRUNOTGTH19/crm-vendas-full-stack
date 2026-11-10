@@ -1,14 +1,33 @@
 """Schemas do assistente de IA.
 
-As entradas são deliberadamente pequenas e fechadas: o chat aceita apenas uma
-mensagem de texto e a geração de status aceita motivo + identificadores. Não
-existe campo de ``user_id`` — o dono dos dados vem sempre do JWT.
+As entradas são deliberadamente pequenas e fechadas: o chat aceita a mensagem
+atual e um histórico opcional (apenas ``user``/``assistant``); a geração de
+status aceita motivo + identificadores. Não existe campo de ``user_id`` — o dono
+dos dados vem sempre do JWT/``resolve_data_owner``.
 """
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
+
+
+class ChatHistoryMessage(BaseModel):
+    """Uma mensagem anterior do chat, já no formato role/content."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=6000)
+
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Conteúdo vazio.")
+        return value
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
+    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=12)
 
     @field_validator("message")
     @classmethod

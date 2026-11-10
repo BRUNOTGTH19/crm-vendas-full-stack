@@ -1,8 +1,9 @@
 """Endpoints do assistente de IA.
 
-O token JWT é obrigatório em ambas as rotas. O ``user_id`` usado nas consultas
-vem exclusivamente de ``current_user.id``; nenhum argumento do modelo é aceito
-como escopo de dados.
+O token JWT é obrigatório em ambas as rotas. O escopo dos dados vem de
+``resolve_data_owner`` (usuário comum = próprio id; admin = global ou usuário
+selecionado via ``X-View-User``); nenhum argumento do modelo é aceito como
+escopo de dados.
 """
 import logging
 
@@ -10,8 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.auth_middleware import get_current_user_dependency
-from models.user import User
+from middleware.auth_middleware import (
+    get_current_user_dependency,
+    resolve_data_owner,
+)
+from models.user import User, UserRole
 from schemas.ai import (
     ChatRequest,
     ChatResponse,
@@ -38,10 +42,19 @@ async def chat_endpoint(
     data: ChatRequest,
     db: Session = Depends(get_db),  # noqa: B008 - padrão do projeto (FastAPI)
     current_user: User = Depends(get_current_user_dependency),  # noqa: B008
+    owner_id: int | None = Depends(resolve_data_owner),
 ):
-    """Consulta dados via tools fixas, sempre no escopo do usuário do JWT."""
+    """Consulta dados via tools fixas no escopo resolvido para o usuário."""
+    is_admin = bool(current_user.role == UserRole.admin)
     try:
-        reply = await ai_service.generate_chat_reply(db, current_user.id, data.message)
+        reply = await ai_service.generate_chat_reply(
+            db,
+            current_user.id,
+            data.message,
+            history=data.history,
+            is_admin=is_admin,
+            owner_id=owner_id,
+        )
     except ai_service.AIConfigurationError:
         # Mensagem genérica: não revela qual variável falta nem seu conteúdo.
         logger.error("ai_not_configured")
