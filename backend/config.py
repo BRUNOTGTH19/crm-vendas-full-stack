@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 480  # 8 horas
     refresh_token_expire_days: int = 7
 
+    # Bootstrap de administrador: e-mail que deve ser promovido a admin no
+    # login/validação do token. Deixe vazio (padrão) para não promover ninguém.
+    # O cadastro público nunca cria admin; defina ADMIN_EMAIL no Render para
+    # liberar a área administrativa para a sua conta já cadastrada.
+    admin_email: str = ""
+
     # --- Web Push (notificações de alerta de prazo de vendas) ---
     # Gere o par de chaves com: python gen_vapid_keys.py
     # A pública vai para o frontend (applicationServerKey); a privada fica aqui.

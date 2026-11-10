@@ -8,11 +8,12 @@ registro de auditoria da exclusão.
 Usam SQLite em memória com foreign keys e serviços externos simulados
 (conftest.py). Nenhuma conexão com o banco configurado é realizada.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
+from config import settings
 from database import SessionLocal
 from main import app
 from models.audit_log import AuditLog
@@ -231,3 +232,37 @@ def test_delete_common_user_cascades_data(admin):
 
         # O admin permanece intacto
         assert db.get(User, admin["id"]) is not None
+
+# ---------------------------------------------------------------------------
+# Separação de papéis: cadastro público + bootstrap por ADMIN_EMAIL
+# ---------------------------------------------------------------------------
+def test_public_register_rejects_admin_role():
+    stamp = datetime.now(timezone.utc).strftime("%H%M%S%f")
+    r = client.post(
+        "/auth/register",
+        json={
+            "name": "Quase Admin",
+            "email": f"role_abuse_{stamp}@crm.com",
+            "password": "123456",
+            "role": "admin",
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_bootstrap_admin_promotes_configured_email(monkeypatch):
+    stamp = datetime.now(timezone.utc).strftime("%H%M%S%f")
+    email = f"bootstrap_{stamp}@crm.com"
+    _register("Bootstrap Admin", email)
+
+    # Sem ADMIN_EMAIL, o usuário continua comum.
+    monkeypatch.setattr(settings, "admin_email", "")
+    assert client.get("/admin/users", headers=_login(email)).status_code == 403
+
+    # Definindo o e-mail (comparação sem caixa), o login promove a admin.
+    monkeypatch.setattr(settings, "admin_email", f"  {email.upper()}  ")
+    headers = _login(email)
+    assert client.get("/admin/users", headers=headers).status_code == 200
+
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.email == email).one().role == "admin"

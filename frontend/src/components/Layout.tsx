@@ -29,7 +29,7 @@ const NAV = [
 // lateral/desktop) para não remover nenhuma funcionalidade existente.
 const BOTTOM_NAV = NAV.filter((n) => n.href !== "#/history");
 
-const ADMIN_NAV = { href: "#/admin/dados", label: "Dados (admin)", Icon: IconDatabase };
+const ADMIN_NAV = { href: "#/admin/dados", label: "Admin", Icon: IconDatabase };
 
 interface LayoutProps {
   user: User;
@@ -110,7 +110,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
 
   const isActive = (href: string) => current.split("?")[0] === href.replace("#", "");
 
-  const navItems = user.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
+  const bottomItems = user.role === "admin" ? [...BOTTOM_NAV, ADMIN_NAV] : BOTTOM_NAV;
 
   return (
     <div className="min-h-screen text-ink">
@@ -129,7 +129,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
         </a>
 
         <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-2">
-          {navItems.map(({ href, label, Icon }) => {
+          {NAV.map(({ href, label, Icon }) => {
             const active = isActive(href);
             return (
               <a
@@ -147,6 +147,30 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
               </a>
             );
           })}
+
+          {user.role === "admin" && (
+            <div className="mt-4 border-t border-ink/[0.06] pt-3 dark:border-white/10">
+              <p className="px-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-ink/70">
+                Administração
+              </p>
+              <a
+                href={ADMIN_NAV.href}
+                aria-current={isActive(ADMIN_NAV.href) ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold transition ${
+                  isActive(ADMIN_NAV.href)
+                    ? "bg-brand-950 text-white shadow-card dark:bg-lime dark:text-brand-950"
+                    : "text-ink/70 hover:bg-ink/5 hover:text-ink dark:hover:bg-white/5"
+                }`}
+              >
+                <IconDatabase
+                  className={`h-5 w-5 shrink-0 ${
+                    isActive(ADMIN_NAV.href) ? "text-lime dark:text-brand-950" : "text-ink/70"
+                  }`}
+                />
+                <span className="truncate">Dados e usuários</span>
+              </a>
+            </div>
+          )}
         </nav>
 
         <div className="space-y-3 border-t border-ink/[0.06] px-4 py-4 dark:border-white/10">
@@ -222,7 +246,7 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
 
       {/* Bottom bar mobile — todas as rotas principais + sair. */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-ink/[0.08] bg-paper/95 backdrop-blur-md dark:border-white/10 lg:hidden">
-        {BOTTOM_NAV.map(({ href, label, Icon }) => {
+        {bottomItems.map(({ href, label, Icon }) => {
           const active = isActive(href);
           return (
             <a

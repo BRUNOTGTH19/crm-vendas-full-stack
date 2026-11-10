@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { clearSession, getSessionUser } from "./lib/api.ts";
+import { authMe, clearSession, getSessionUser, updateSessionUser } from "./lib/api.ts";
 import { useIdleSession } from "./lib/use-idle-session.ts";
 import { IDLE_LOGOUT_MESSAGE, secondsLeft } from "./lib/session-idle.ts";
 import { Layout } from "./components/Layout.tsx";
@@ -72,6 +72,17 @@ export function App(): ReactNode {
       window.removeEventListener("crm_auth_changed", onChange);
       window.removeEventListener("crm_session_revoked", onChange);
     };
+  }, []);
+
+  // Revalida o usuário no backend ao abrir o app: mantém o papel/role em dia
+  // (ex.: promoção a admin feita no servidor) sem exigir novo login manual.
+  useEffect(() => {
+    if (!getSessionUser()) return;
+    void authMe()
+      .then(updateSessionUser)
+      .catch(() => {
+        // 401 já limpa a sessão no interceptor; erro de rede mantém o cache.
+      });
   }, []);
 
   /** Encerra a sessão local e avisa o motivo (inatividade vs. logout manual). */

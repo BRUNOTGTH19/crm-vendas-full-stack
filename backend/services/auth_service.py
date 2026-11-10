@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from models.password_reset_token import PasswordResetToken
-from models.user import User
+from models.user import User, UserRole
 from redis_client import redis_client
 from schemas.user import UserCreate
 
@@ -109,6 +109,25 @@ def delete_session(user_id: int) -> None:
     except Exception:
         # A invalidação real é o token_version no banco; Redis é complementar.
         pass
+
+
+def _promote_bootstrap_admin(db: Session, user: User) -> bool:
+    """Promove a admin o e-mail configurado em ``ADMIN_EMAIL``.
+
+    O cadastro público cria sempre ``user``. Este bootstrap libera a área
+    administrativa sem SQL manual: é idempotente, não cria conta e só age
+    quando a variável está definida. O e-mail precisa já estar cadastrado.
+    """
+    admin_email = (settings.admin_email or "").strip().lower()
+    if not admin_email or user.role == UserRole.admin:
+        return False
+    if (user.email or "").strip().lower() != admin_email:
+        return False
+    user.role = UserRole.admin
+    db.commit()
+    db.refresh(user)
+    logging.getLogger(__name__).info("admin_promoted user_id=%s", user.id)
+    return True
 
 
 def register_user(db: Session, data: UserCreate) -> User:
@@ -218,6 +237,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
     if not user or not verify_password(password, user.password_hash):
         raise ValueError("Credenciais inválidas")
 
+    _promote_bootstrap_admin(db, user)
+
     payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     access_token = create_access_token(payload, user.token_version)
     refresh_token = create_refresh_token(payload, user.token_version)
@@ -272,4 +293,5 @@ def get_current_user(db: Session, token: str) -> User:
         raise ValueError("Sessão invalidada. Faça login novamente.")
 
     # A consulta do usuário já era necessária; o "tv" é comparado na mesma linha.
+    _promote_bootstrap_admin(db, user)
     return user
