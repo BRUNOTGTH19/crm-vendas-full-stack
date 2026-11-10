@@ -157,6 +157,11 @@ export function authMe(): Promise<User> {
   return api.get<User>("/auth/me");
 }
 
+/** Torna o usuário logado administrador usando o código de ativação. */
+export function activateAdmin(code: string): Promise<User> {
+  return api.post<User>("/auth/activate-admin", { code });
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**

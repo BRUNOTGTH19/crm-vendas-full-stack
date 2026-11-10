@@ -1,7 +1,9 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import type { User } from "../types.ts";
+import { activateAdmin, ApiError, updateSessionUser } from "../lib/api.ts";
 import { getPushState, enablePush, disablePush } from "../lib/push.ts";
 import { initialsOf, roleLabel } from "../lib/user-label.ts";
+import { Modal } from "./Modal.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import {
   IconBell,
@@ -112,6 +114,32 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
 
   const bottomItems = user.role === "admin" ? [...BOTTOM_NAV, ADMIN_NAV] : BOTTOM_NAV;
 
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [activateCode, setActivateCode] = useState("");
+  const [activateBusy, setActivateBusy] = useState(false);
+  const [activateError, setActivateError] = useState("");
+
+  async function submitActivation(event: FormEvent) {
+    event.preventDefault();
+    const code = activateCode.trim();
+    if (!code || activateBusy) return;
+    setActivateBusy(true);
+    setActivateError("");
+    try {
+      const updated = await activateAdmin(code);
+      updateSessionUser(updated);
+      setActivateOpen(false);
+      setActivateCode("");
+      window.location.hash = ADMIN_NAV.href;
+    } catch (err) {
+      setActivateError(
+        err instanceof ApiError ? err.detail : "Não foi possível ativar o acesso agora."
+      );
+    } finally {
+      setActivateBusy(false);
+    }
+  }
+
   return (
     <div className="min-h-screen text-ink">
       {/* Sidebar desktop */}
@@ -177,6 +205,17 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           <PushToggle />
           <ThemeToggle variant="full" />
 
+          {user.role !== "admin" && (
+            <button
+              type="button"
+              onClick={() => setActivateOpen(true)}
+              className="inline-flex min-h-9 items-center gap-2 self-start rounded-full px-2.5 py-1 text-[11px] font-bold text-ink/70 transition hover:bg-ink/5 hover:text-ink dark:hover:bg-white/5"
+            >
+              <IconDatabase className="h-4 w-4" />
+              Ativar acesso admin
+            </button>
+          )}
+
           <div className="flex items-center gap-2 rounded-2xl border border-ink/[0.06] bg-white/60 p-2.5 dark:border-white/10 dark:bg-white/5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-extrabold text-brand-900 dark:bg-brand-900 dark:text-lime">
               {initialsOf(user.name)}
@@ -214,6 +253,17 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           </a>
 
           <div className="flex items-center gap-1.5">
+            {user.role !== "admin" && (
+              <button
+                type="button"
+                onClick={() => setActivateOpen(true)}
+                className="icon-btn"
+                aria-label="Ativar acesso admin"
+                title="Ativar acesso admin"
+              >
+                <IconDatabase className="h-4 w-4" />
+              </button>
+            )}
             {user.role === "admin" && (
               <a
                 href={ADMIN_NAV.href}
@@ -285,6 +335,55 @@ export function Layout({ user, onLogout, children }: LayoutProps) {
           {children}
         </div>
       </main>
+
+      {activateOpen && (
+        <Modal title="Ativar acesso administrador" onClose={() => setActivateOpen(false)}>
+          <form onSubmit={submitActivation} className="space-y-4">
+            <p className="text-sm leading-relaxed text-ink/70">
+              Digite o código de ativação para liberar a área administrativa nesta
+              conta. O código aparece no log do backend (Render → Logs) na primeira
+              vez que o app é aberto sem administrador, ou pode ser definido na
+              variável <strong className="font-bold">ADMIN_SETUP_CODE</strong>.
+            </p>
+            <label className="block">
+              <span className="label">Código de ativação</span>
+              <input
+                type="password"
+                className="field"
+                value={activateCode}
+                onChange={(event) => setActivateCode(event.target.value)}
+                maxLength={256}
+                autoComplete="off"
+                autoFocus
+                disabled={activateBusy}
+                placeholder="Cole aqui o código"
+              />
+            </label>
+            {activateError && (
+              <p role="alert" className="error-text">
+                {activateError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setActivateOpen(false)}
+                disabled={activateBusy}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={activateBusy || !activateCode.trim()}
+              >
+                {activateBusy ? "Ativando…" : "Ativar"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
