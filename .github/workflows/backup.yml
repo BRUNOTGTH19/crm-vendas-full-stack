@@ -6,12 +6,10 @@ name: Backup MySQL
 #
 # Configuração (uma vez):
 #   GitHub → Settings → Secrets and variables → Actions → New repository secret
-#   Nome: DATABASE_URL
-#   Valor: mysql+pymysql://crm_backup:senha@host:porta/banco
+#   Nome: DATABASE_URL   Valor: mysql+pymysql://user:senha@host:porta/banco
 #
-# Use o usuário só de leitura criado por backend/sql/create_backup_user.sql, não
-# o da aplicação. O dump contém dados de clientes: o artifact é privado enquanto
-# o repositório for privado — em repositório público, remova o upload.
+# O dump contém dados de clientes: o artifact é privado enquanto o repositório
+# for privado — em repositório público, remova o upload.
 #
 # Sem o secret o job apenas registra um aviso e termina com sucesso, para não
 # gerar falhas diárias antes da configuração.
