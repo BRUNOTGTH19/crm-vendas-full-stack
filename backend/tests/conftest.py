@@ -8,6 +8,10 @@ os.environ["REDIS_URL"] = "redis://127.0.0.1:1/15"
 os.environ["JWT_SECRET_KEY"] = "isolated-test-key-not-for-production"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["ALLOW_DATABASE_RESET"] = "true"
+# A suíte cobre o fluxo legado de redefinição (A1); em produção ele vem
+# desligado. O bcrypt custa 10 no teste para não deixar a suíte lenta.
+os.environ["ALLOW_LEGACY_PASSWORD_RESET"] = "true"
+os.environ["BCRYPT_ROUNDS"] = "10"
 os.environ["REMINDER_DAYS_BEFORE"] = "0"
 os.environ["REMINDER_HOUR"] = "8"
 os.environ["REMINDER_TIMEZONE"] = "UTC"

@@ -26,7 +26,7 @@ from services import auth_service
 from services.auth_service import hash_password
 
 client = TestClient(app)
-PASSWORD = "123456"
+PASSWORD = "12345678"
 PASSWORD_HASH = hash_password(PASSWORD)
 
 

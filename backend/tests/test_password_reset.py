@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+from config import settings
 from middleware.rate_limit import PASSWORD_RESET_MAX_ATTEMPTS, reset_rate_limit
 
 client = TestClient(app)
@@ -28,7 +29,7 @@ def registered_user():
     email = f"reset_{stamp}@crm.com"
     r = client.post(
         "/auth/register",
-        json={"name": "Reset Senha", "email": email, "password": "123456"},
+        json={"name": "Reset Senha", "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
     return email
@@ -47,7 +48,7 @@ def _reset(email: str, new_password: str):
 
 def test_reset_changes_password_and_old_stops_working(registered_user):
     assert _reset(registered_user, "nova-senha-456").status_code == 204
-    assert _login(registered_user, "123456").status_code == 401
+    assert _login(registered_user, "12345678").status_code == 401
     r = _login(registered_user, "nova-senha-456")
     assert r.status_code == 200, r.text
 
@@ -61,7 +62,7 @@ def test_reset_short_password_is_rejected(registered_user):
     r = _reset(registered_user, "123")
     assert r.status_code == 422
     # A senha original continua valendo.
-    assert _login(registered_user, "123456").status_code == 200
+    assert _login(registered_user, "12345678").status_code == 200
 
 
 def test_reset_rate_limited_per_ip():
@@ -72,3 +73,16 @@ def test_reset_rate_limited_per_ip():
     r = _reset("mais_uma@crm.com", "senha-valida-1")
     assert r.status_code == 429
     assert "Tente novamente" in r.json()["detail"]
+
+
+def test_legacy_reset_is_disabled_by_default(registered_user, monkeypatch):
+    """A1: sem ``ALLOW_LEGACY_PASSWORD_RESET`` o endpoint não existe (404)."""
+    monkeypatch.setattr(settings, "allow_legacy_password_reset", False)
+
+    r = _reset(registered_user, "senha-nova-123")
+
+    assert r.status_code == 404
+    # A senha original continua valendo e a nova não foi aceita.
+    assert _login(registered_user, "12345678").status_code == 200
+    assert _login(registered_user, "senha-nova-123").status_code == 401
+

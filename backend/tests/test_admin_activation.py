@@ -30,14 +30,14 @@ def _stamp() -> str:
 def _register(name: str, email: str) -> dict:
     r = client.post(
         "/auth/register",
-        json={"name": name, "email": email, "password": "123456"},
+        json={"name": name, "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
     return r.json()
 
 
 def _login(email: str) -> dict:
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -163,3 +163,40 @@ def test_wrong_code_is_rate_limited():
     for _ in range(10):
         assert _activate(headers, "errado").status_code == 400
     assert _activate(headers, "errado").status_code == 429
+
+
+def test_non_ascii_code_validates_without_crashing(monkeypatch):
+    """A9: ``compare_digest`` só aceita ASCII; acento não pode gerar 500."""
+    monkeypatch.setattr(settings, "admin_setup_code", "chave-secreta-ação")
+    stamp = _stamp()
+    email = f"acento_{stamp}@crm.com"
+    _register("Acento", email)
+    headers = _login(email)
+
+    # Código errado, também com acento: erro limpo (400), não 500.
+    assert _activate(headers, "chave-errada-ação").status_code == 400
+
+    r = _activate(headers, "chave-secreta-ação")
+    assert r.status_code == 200, r.text
+    assert r.json()["role"] == "admin"
+
+
+def test_failed_activation_leaves_audit_trail(monkeypatch):
+    """A16: tentativa inválida é registrada (sem guardar o código digitado)."""
+    monkeypatch.setattr(settings, "admin_setup_code", "codigo-de-teste")
+    stamp = _stamp()
+    email = f"audit_{stamp}@crm.com"
+    created = _register("Auditoria", email)
+    headers = _login(email)
+
+    assert _activate(headers, "codigo-errado").status_code == 400
+
+    with SessionLocal() as db:
+        log = (
+            db.query(AuditLog)
+            .filter(AuditLog.action == "admin_activation_failed")
+            .one()
+        )
+    assert log.user_id == created["id"]
+    assert log.detail == "invalid_code"
+

@@ -36,3 +36,25 @@ def test_queue_service_client_is_built_without_ssl_for_plain_redis():
     """O cliente da fila de PDFs não carrega ``ssl_cert_reqs`` em ``redis://``."""
     assert QUEUE_CLIENT_KWARGS.get("ssl_cert_reqs") is None
     assert QUEUE_CLIENT_KWARGS["decode_responses"] is False
+
+
+def test_ssl_required_only_for_tls_urls():
+    """Em ``rediss://`` o certificado é validado; em ``redis://`` não há TLS."""
+    import redis_client as redis_client_module
+
+    assert redis_client_module._ssl_options("rediss://default:secret@host:6379/0") == {
+        "ssl_cert_reqs": "required"
+    }
+    assert redis_client_module._ssl_options("redis://localhost:6379/0") == {}
+
+
+def test_build_redis_client_enables_certificate_validation_on_tls(monkeypatch):
+    """A fábrica repassa ``ssl_cert_reqs="required"`` quando a URL é TLS."""
+    import redis_client as redis_client_module
+
+    monkeypatch.setattr(
+        redis_client_module, "_ssl_kwargs", {"ssl_cert_reqs": "required"}
+    )
+    created = redis_client_module.build_redis_client()
+    assert created.connection_pool.connection_kwargs.get("ssl_cert_reqs") == "required"
+

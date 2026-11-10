@@ -58,13 +58,13 @@ JSON_ROUTES = [
 def _register(email: str) -> None:
     r = client.post(
         "/auth/register",
-        json={"name": "Relatorios Teste", "email": email, "password": "123456"},
+        json={"name": "Relatorios Teste", "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
 
 
 def _login(email: str) -> dict:
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

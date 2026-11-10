@@ -27,7 +27,7 @@ def registered_user():
     email = f"ratelimit_{stamp}@crm.com"
     r = client.post(
         "/auth/register",
-        json={"name": "Rate Limit", "email": email, "password": "123456"},
+        json={"name": "Rate Limit", "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
     return email
@@ -50,12 +50,12 @@ def test_failed_logins_are_counted_and_then_blocked(registered_user):
     assert r.status_code == 429
     assert "Tente novamente" in r.json()["detail"]
 
-    r = _login(registered_user, "123456")
+    r = _login(registered_user, "12345678")
     assert r.status_code == 429
 
 
 def test_successful_logins_do_not_count(registered_user):
     """Logins corretos nunca alimentam o contador de bloqueio."""
     for _ in range(LOGIN_MAX_FAILURES + 5):
-        r = _login(registered_user, "123456")
+        r = _login(registered_user, "12345678")
         assert r.status_code == 200

@@ -920,3 +920,44 @@ def test_cashflow_is_scoped_and_validates_month(seed):
                 "get_cashflow",
                 {"month": "2026-10", "user_id": seed["user_b"]},
             )
+
+
+# ---------------------------------------------------------------------------
+# Cota por usuário (A3)
+# ---------------------------------------------------------------------------
+def test_ai_quota_blocks_after_configured_limit(monkeypatch, seed):
+    from config import settings
+    from middleware.rate_limit import reset_rate_limit
+
+    reset_rate_limit()
+    monkeypatch.setattr(settings, "ai_max_messages_per_hour", 1)
+    _configure_ai(monkeypatch)
+    provider = AsyncMock(return_value=_completion("ok"))
+    monkeypatch.setattr(ai_service, "_request_chat_completion", provider)
+    headers = _auth(seed["user_a"])
+
+    try:
+        first = client.post("/ai/chat", json={"message": "oi"}, headers=headers)
+        assert first.status_code == 200, first.text
+
+        second = client.post("/ai/chat", json={"message": "de novo"}, headers=headers)
+        assert second.status_code == 429
+        assert "Limite de mensagens" in second.json()["detail"]
+    finally:
+        reset_rate_limit()
+
+
+def test_ai_disabled_by_quota_zero_returns_503(monkeypatch, seed):
+    from config import settings
+
+    monkeypatch.setattr(settings, "ai_max_messages_per_hour", 0)
+    _configure_ai(monkeypatch)
+
+    response = client.post(
+        "/ai/chat",
+        json={"message": "oi"},
+        headers=_auth(seed["user_a"]),
+    )
+    assert response.status_code == 503
+    assert "desativado" in response.json()["detail"]
+

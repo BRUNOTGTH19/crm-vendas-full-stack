@@ -30,14 +30,14 @@ client = TestClient(app)
 def _register(name: str, email: str) -> dict:
     r = client.post(
         "/auth/register",
-        json={"name": name, "email": email, "password": "123456"},
+        json={"name": name, "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
     return r.json()
 
 
 def _login(email: str) -> dict:
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -243,7 +243,7 @@ def test_public_register_rejects_admin_role():
         json={
             "name": "Quase Admin",
             "email": f"role_abuse_{stamp}@crm.com",
-            "password": "123456",
+            "password": "12345678",
             "role": "admin",
         },
     )

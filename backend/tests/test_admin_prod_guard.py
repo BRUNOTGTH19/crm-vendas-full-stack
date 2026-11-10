@@ -18,7 +18,7 @@ client = TestClient(app)
 def _make_admin(email: str) -> dict:
     r = client.post(
         "/auth/register",
-        json={"name": "Admin Prod", "email": email, "password": "123456"},
+        json={"name": "Admin Prod", "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
     with SessionLocal() as db:
@@ -27,7 +27,7 @@ def _make_admin(email: str) -> dict:
         user = db.query(User).filter(User.email == email).one()
         user.role = "admin"
         db.commit()
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -35,10 +35,10 @@ def _make_admin(email: str) -> dict:
 def _make_user(email: str) -> dict:
     r = client.post(
         "/auth/register",
-        json={"name": "User Prod", "email": email, "password": "123456"},
+        json={"name": "User Prod", "email": email, "password": "12345678"},
     )
     assert r.status_code == 201, r.text
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -76,7 +76,7 @@ def prod_environment():
 def test_register_rejects_admin_role():
     r = client.post(
         "/auth/register",
-        json={"name": "X", "email": f"esc_{id(object())}@crm.com", "password": "123456", "role": "admin"},
+        json={"name": "X", "email": f"esc_{id(object())}@crm.com", "password": "12345678", "role": "admin"},
     )
     assert r.status_code == 422
 

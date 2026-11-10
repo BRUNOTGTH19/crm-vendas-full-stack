@@ -25,14 +25,14 @@ client = TestClient(app)
 def _register(email: str, role: str = "user") -> dict:
     r = client.post(
         "/auth/register",
-        json={"name": "Teste Admin", "email": email, "password": "123456", "role": role},
+        json={"name": "Teste Admin", "email": email, "password": "12345678", "role": role},
     )
     assert r.status_code == 201, r.text
     return r.json()
 
 
 def _login(email: str) -> dict:
-    r = client.post("/auth/login", json={"email": email, "password": "123456"})
+    r = client.post("/auth/login", json={"email": email, "password": "12345678"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
