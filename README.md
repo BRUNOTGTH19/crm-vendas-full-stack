@@ -58,27 +58,25 @@ o modal com a mensagem editável, **Copiar**, **Baixar PDF** e **Abrir WhatsApp*
 ## Assistente de IA (opcional)
 
 O botão flutuante **Assistente** aparece em todas as telas logadas (inclusive no
-celular) e abre um painel com dois modos:
+celular) e abre um único chat: a IA conversa com contexto, escolhe uma das
+ferramentas fixas de leitura do CRM ou pesquisa na internet e devolve a resposta
+em linguagem natural. O histórico recente (até 12 mensagens) é enviado pelo
+frontend para manter o fio da conversa.
 
-- **Consultar dados** — a IA conversa com contexto, escolhe uma das ferramentas
-  fixas de leitura do CRM ou pesquisa na internet e devolve a resposta em
-  linguagem natural. O histórico recente (até 12 mensagens) é enviado pelo
-  frontend para manter o fio da conversa;
-- **Criar status** — gera uma frase curta para o usuário revisar e copiar.
-
-Endpoints (ambos exigem `Authorization: Bearer <JWT>`):
+Endpoint (exige `Authorization: Bearer <JWT>`):
 
 | Endpoint | O quê |
 | --- | --- |
 | `POST /ai/chat` | Chat com function calling. Corpo: `{"message": "...", "history": [{"role": "user", "content": "..."}]}` (histórico opcional, só `user`/`assistant`, máx. 12). |
-| `POST /ai/status-message` | Frase de status. Corpo: `{"motivo": "...", "cliente": "...", "pedido": "..."}`. |
+| `POST /ai/status-message` | Legado: gera uma frase de status. Sem uso na interface; mantido por compatibilidade. |
 
 Ferramentas disponíveis, todas **somente leitura**:
 
-- CRM: `get_sales_summary`, `list_overdue`, `get_sale_status`, `search_clients`,
-  `get_client_details`, `list_sales`, `get_sale_details` (itens e pagamentos),
-  `list_payments`, `top_products`, `client_ranking`, `global_search` e
-  `get_my_profile`;
+- CRM: `get_dashboard_overview` (visão geral do escopo), `get_cashflow` (caixa
+  por mês), `get_sales_summary`, `list_overdue`, `get_sale_status`,
+  `search_clients`, `get_client_details`, `list_sales`, `get_sale_details`
+  (itens e pagamentos), `list_payments`, `top_products`, `client_ranking`,
+  `global_search` e `get_my_profile`;
 - Administração (somente admin): `list_users` e `get_user_summary`;
 - Web: `web_search` e `fetch_url` (texto de páginas públicas).
 
@@ -149,7 +147,7 @@ Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) 
 
 ### Redefinição de senha com token
 
-O admin gera um token de uso único (15 minutos) em **Dados (admin) → Usuários**.
+O admin gera um token de uso único (15 minutos) em **Administração → Dados e usuários**.
 O usuário confirma em `#/reset-password`. Qualquer troca de senha invalida os
 access e refresh tokens emitidos antes dela. Veja o fluxo completo, as decisões
 de segurança e o passo de migration no Render em
@@ -198,8 +196,9 @@ Testes: `npm test` em `frontend/` (`tests/session-idle.test.mjs`).
 
 ## Gestão de dados (admin)
 
-Usuários com papel **admin** têm acesso à área **Dados (admin)** (`#/admin/dados`),
-com três operações protegidas pela dependência `require_admin` (403 para não-admins):
+Usuários com papel **admin** têm acesso à área **Administração → Dados e usuários**
+(`#/admin/dados`), com três operações protegidas pela dependência `require_admin`
+(403 para não-admins):
 
 - `POST /admin/database/reset` — zera as tabelas de dados. Exige `{"confirm": true}`.
   **Preserva a tabela `users`** (não desloga o admin). Apaga, respeitando as FKs:
@@ -213,8 +212,23 @@ com três operações protegidas pela dependência `require_admin` (403 para nã
 
 Toda ação é registrada na tabela de auditoria `audit_logs` (quem, quando, o quê).
 
-Testes: `python -m pytest tests/test_admin.py` (autorização, reset com/sem
-confirmação, exportação, importação skip/overwrite e auditoria).
+### Como virar admin
+
+O cadastro público cria **sempre** usuário comum (`role="user"`); o campo `role`
+do `POST /auth/register` só aceita esse valor (enviar `admin` retorna 422). Para
+liberar a área administrativa:
+
+1. cadastre normalmente a conta na tela de login;
+2. no **Render → Environment**, defina `ADMIN_EMAIL` com o e-mail dessa conta;
+3. faça login novamente (ou apenas recarregue o app, que revalida via
+   `GET /auth/me`). A promoção é idempotente e não cria conta nenhuma.
+
+A área aparece na sidebar como **Administração → Dados e usuários** e também na
+barra inferior do celular. Sem `ADMIN_EMAIL`, ninguém é promovido.
+
+Testes: `python -m pytest tests/test_admin.py tests/test_admin_users.py`
+(autorização, reset com/sem confirmação, exportação, importação skip/overwrite,
+auditoria, rejeição de `role=admin` no cadastro e bootstrap por `ADMIN_EMAIL`).
 
 
 # Deploy (100% gratuito, sem cartão)
@@ -258,6 +272,9 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
    - `REDIS_URL` (do Upstash)
    - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
    - `ENVIRONMENT=production`
+   - **(opcional)** `ADMIN_EMAIL=voce@exemplo.com` — promove essa conta já
+     cadastrada a administrador no login/revalidação. Sem ela, ninguém tem acesso
+     à área admin (o cadastro público nunca cria admin).
    - **(opcional)** `ALLOW_DATABASE_RESET=true` — habilita o botão "Zerar dados"
      no painel admin. O padrão já é `true`; use `false` para bloquear totalmente.
    - **(opcional)** `CORS_ALLOW_ORIGINS=*` — origens permitidas (separadas por
