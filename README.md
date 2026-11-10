@@ -223,9 +223,9 @@ Há dois caminhos para liberar a área administrativa:
 
 1. cadastre e entre normalmente na sua conta;
 2. o backend gera um código aleatório na primeira vez que o app é aberto sem
-   existir administrador e o registra **apenas no log do servidor**
-   (`admin_setup_code_generated ...`). No Render, veja **Logs**; localmente, o
-   terminal do backend;
+   existir administrador e guarda **apenas o hash SHA-256** no banco; o texto
+   claro aparece **uma vez** no log do servidor (`admin_setup_code_generated
+   ...`). No Render, veja **Logs**; localmente, o terminal do backend;
 3. no app, clique em **Ativar acesso admin** (sidebar ou ícone no topo), cole o
    código e confirme. A partir daí a área administrativa é liberada.
 
@@ -238,12 +238,27 @@ quem souber a chave consegue ativar o admin. O endpoint é
 `POST /auth/activate-admin` `{ "code": "..." }`, autenticado e com rate limit
 por IP.
 
+**Rotação do código (A4/A13)**
+
+- Com `ADMIN_SETUP_CODE` definido, a variável é a fonte da verdade: troque o
+  valor em **Render → Environment** e reinicie o serviço. O comando abaixo se
+  recusa a rodar nesse caso, justamente para não criar um segundo segredo.
+- Sem a variável, no **Render Shell** (ou localmente):
+  `python manage.py rotate-admin-code`. Ele invalida o código anterior, gera um
+  novo e o imprime **só na saída do comando** (o banco guarda apenas o hash).
+  Para encerrar a ativação por código: `python manage.py expire-admin-code`.
+
 **2. E-mail fixo (`ADMIN_EMAIL`)**
 
 1. cadastre normalmente a conta na tela de login;
 2. no **Render → Environment**, defina `ADMIN_EMAIL` com o e-mail dessa conta;
 3. faça login novamente (ou recarregue o app, que revalida via `GET /auth/me`).
    A promoção é idempotente e não cria conta nenhuma.
+
+A partir daí `ADMIN_EMAIL` **não promove mais ninguém** (só o primeiro admin,
+para evitar escalada silenciosa). Para promover outra conta existente use
+`python manage.py promote-admin --email outra@conta.com` no Render Shell — o
+comando registra a ação na auditoria.
 
 A área aparece na sidebar como **Administração → Dados e usuários** e também na
 barra inferior do celular.
@@ -297,13 +312,23 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
    - `JWT_SECRET_KEY` (gerar com: `python -c "import secrets; print(secrets.token_hex(32))"`)
    - `ENVIRONMENT=production`
    - **(opcional)** `ADMIN_EMAIL=voce@exemplo.com` — promove essa conta já
-     cadastrada a administrador no login/revalidação. O cadastro público nunca
-     cria admin.
+     cadastrada a administrador **somente se ainda não existir nenhum admin**
+     (bootstrap). Depois disso o caminho é `ADMIN_SETUP_CODE` ou
+     `python manage.py promote-admin --email ...` no Render Shell.
    - **(opcional)** `ADMIN_SETUP_CODE=segredo-forte` — código digitado em
-     **Ativar acesso admin** para virar admin sem depender do e-mail. Se vazio,
-     o backend gera um código de uso único e o mostra no log do servidor.
-   - **(opcional)** `ALLOW_DATABASE_RESET=true` — habilita o botão "Zerar dados"
-     no painel admin. O padrão já é `true`; use `false` para bloquear totalmente.
+     **Ativar acesso admin** para virar admin sem depender do e-mail. Funciona
+     como chave mestra (inclusive para recuperar o acesso depois). Se vazio, o
+     backend gera um código de uso único, guarda só o hash SHA-256 no banco e o
+     mostra **uma vez** no log do servidor.
+   - `RATE_LIMIT_BACKEND=redis` — contadores de rate limit e o lock do lembrete
+     diário compartilhados entre instâncias via `REDIS_URL`. Sem isso o limite é
+     por processo; com Redis indisponível o backend volta para a memória em vez
+     de derrubar o login.
+   - **(opcional)** `ALLOW_DATABASE_RESET=false` — o padrão já é `false`: o botão
+     "Zerar dados" responde 403 até você ligar a variável temporariamente.
+   - **(opcional)** `ALLOW_LEGACY_PASSWORD_RESET=false` — o padrão já é `false`.
+     Mantém desligado o reset de senha só com e-mail; use o fluxo por token
+     gerado no painel admin ou `python manage.py set-password`.
    - **(opcional)** `CORS_ALLOW_ORIGINS=*` — origens permitidas (separadas por
      vírgula). `*` libera todas; para restringir, informe o domínio do frontend
      (ex.: `https://seu-app.vercel.app`).
@@ -339,3 +364,56 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
 4. URL: `https://URL-DO-SEU-BACKEND.onrender.com/health`
 5. Interval: 5 minutes
 6. Save
+
+## 6. Backup e restauração do MySQL
+
+O backup é um dump lógico comprimido (`crm-AAAAMMDD-HHMMSS.sql.gz`), gerado por
+`backend/backup_mysql.py` com `mysqldump --single-transaction`. A senha vai em
+um arquivo temporário `0600` (nunca em `argv`/ambiente) e cada dump é validado
+pelo cabeçalho antes de substituir o anterior.
+
+### Agendamento (GitHub Actions)
+
+O Render não tem cron no plano gratuito, então quem agenda é o GitHub:
+
+1. **Settings → Secrets and variables → Actions → New repository secret**
+2. Nome `DATABASE_URL`, valor `mysql+pymysql://user:senha@host:porta/banco`
+   (o mesmo do Render, com permissão de leitura nas tabelas)
+3. O workflow `.github/workflows/backup.yml` roda todo dia às **03:00**
+   (America/Sao_Paulo) e também em **Actions → Backup MySQL → Run workflow**
+4. Cada execução publica o dump como artifact por **14 dias** (retenção do
+   próprio GitHub). O Render apaga o disco a cada deploy, então nunca guarde o
+   dump só lá.
+
+Sem o secret o workflow não falha: ele registra um aviso e encerra, para não
+poluir o histórico antes da configuração.
+
+Manual, em qualquer máquina com o cliente MySQL:
+
+```bash
+cd backend
+python backup_mysql.py --output-dir /var/backups/crm --keep 14
+```
+
+### Testar a restauração
+
+Restaurar em um banco **descartável** e comparar com a origem:
+
+```bash
+cd backend
+python restore_mysql.py \
+  --dump /var/backups/crm/crm-20261110-030000.sql.gz \
+  --database crm_restore_check --create --compare --drop
+```
+
+- `--create` cria o banco de destino; `--drop` apaga só o que este comando criou.
+- `--compare` falha se o destino tiver menos tabelas que a origem.
+- O comando **recusa** restaurar no banco da `DATABASE_URL`: para promover uma
+  restauração, valide em outro banco e troque manualmente.
+- O botão **Run workflow** do GitHub Actions aceita `restore_check` para rodar
+  essa validação na nuvem (o usuário do banco precisa de `CREATE DATABASE`).
+
+Fluxo seguro para recuperar um incidente: restaure em um banco novo, confira as
+tabelas e os totais, aponte a `DATABASE_URL` para ele (ou copie as tabelas via
+`mysqldump` do banco validado) e mantenha o banco antigo intacto por alguns dias.
+
