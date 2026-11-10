@@ -17,8 +17,8 @@ export function ResetPasswordConfirm() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (password.length < 6) {
-      setError("A nova senha precisa ter pelo menos 6 caracteres.");
+    if (password.length < 8) {
+      setError("A nova senha precisa ter pelo menos 8 caracteres.");
       return;
     }
     if (password !== confirmation) {
@@ -103,13 +103,13 @@ export function ResetPasswordConfirm() {
                   id="reset-password"
                   type="password"
                   required
-                  minLength={6}
-                  maxLength={128}
+                  minLength={8}
+                  maxLength={72}
                   autoComplete="new-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="field"
-                  placeholder="mínimo 6 caracteres"
+                  placeholder="mínimo 8 caracteres"
                 />
               </div>
               <div>
@@ -120,8 +120,8 @@ export function ResetPasswordConfirm() {
                   id="reset-confirmation"
                   type="password"
                   required
-                  minLength={6}
-                  maxLength={128}
+                  minLength={8}
+                  maxLength={72}
                   autoComplete="new-password"
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}

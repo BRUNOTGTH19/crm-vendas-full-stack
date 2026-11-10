@@ -1,10 +1,9 @@
 /* Service Worker: somente arquivos públicos estáticos são armazenados offline. */
-// v8: renomeado a cada mudança visível do app — o `activate` apaga os caches
-// antigos, senão o celular continuaria servindo um bundle velho (cache-first)
-// mesmo depois do deploy. v6 invalidou o bundle anterior à correção do seletor
-// de tema; v7 entregou o Markdown das respostas da IA; v8 traz a ativação de
-// administrador por código.
-const CACHE = "crm-vendas-cache-v8";
+// v9: as respostas da API deixaram de ser guardadas no Cache Storage (A2 da
+// auditoria). Antes o SW as copiava e, offline, servia dados de uma sessão
+// anterior — inclusive de outro usuário no mesmo aparelho. O cache só existe
+// para estáticos; o `clearSession` no logout também apaga o Cache Storage.
+const CACHE = "crm-vendas-cache-v9";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -84,22 +83,9 @@ self.addEventListener("fetch", (event) => {
   const isApi = url.pathname.startsWith("/api/") || url.origin.includes("onrender.com") || url.origin.includes("localhost:8000");
 
   if (isApi) {
-    // API: Network First (priorizar datos frescos, respaldo a cache si offline)
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          openCache()
-            .then((c) => c.put(event.request, copy))
-            .catch(() => {});
-          return res;
-        })
-        .catch(() =>
-          openCache()
-            .then((c) => c.match(event.request))
-            .then((cached) => cached || Response.error())
-        )
-    );
+    // API: network-only. No se guarda ni se sirve desde caché: los datos son
+    // por usuario y no deben sobrevivir al cierre de sesión (A2).
+    // Devolver sin `respondWith` deja que el navegador haga la petición normal.
     return;
   }
 

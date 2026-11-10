@@ -90,12 +90,13 @@ export function Register() {
                   id="register-password"
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={72}
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="field"
-                  placeholder="Mínimo de 6 caracteres"
+                  placeholder="Mínimo de 8 caracteres"
                 />
               </div>
 

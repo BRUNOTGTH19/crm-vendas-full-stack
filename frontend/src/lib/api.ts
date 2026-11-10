@@ -62,6 +62,11 @@ export function setSession(token: TokenResponse): void {
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // O service worker guardava respostas da API no Cache Storage. Dados de um
+  // usuário não podem sobreviver ao logout (A2), então limpamos tudo.
+  if (typeof caches !== "undefined") {
+    void caches.keys().then((names) => Promise.all(names.map((name) => caches.delete(name))));
+  }
   window.dispatchEvent(new Event("crm_auth_changed"));
 }
 
@@ -163,17 +168,6 @@ export function activateAdmin(code: string): Promise<User> {
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/**
- * Redefinição simples de senha (tela de login): sem link, código ou e-mail.
- * Basta o e-mail cadastrado + a nova senha.
- */
-export function resetPassword(email: string, newPassword: string): Promise<void> {
-  return api.post<void>("/auth/reset-password", {
-    email,
-    new_password: newPassword,
-  });
-}
 
 /** Confirma a troca usando o token de uso único entregue pelo administrador. */
 export function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
