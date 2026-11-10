@@ -6,7 +6,9 @@ O administrador gera um token de uso único para um usuário específico. O
 usuário confirma a nova senha na tela pública `#/reset-password`. A troca de
 senha invalida **todos** os access e refresh tokens emitidos antes dela.
 
-Não há envio de e-mail. O admin entrega o token pessoalmente ao usuário.
+Desde a versão com "Esqueci minha senha", o próprio usuário também pode pedir o
+token por e-mail (`POST /auth/forgot-password`), desde que o backend tenha SMTP
+configurado. Sem SMTP, vale o fluxo manual: o admin entrega o token pessoalmente.
 
 ## Fluxo
 
@@ -29,11 +31,19 @@ usuário. A confirmação também consome qualquer outro token pendente dele.
 | --- | --- | --- |
 | `POST /admin/users/{user_id}/reset-token` | admin | `200` com `{ token, expires_at }`; `400` para o próprio admin; `403` para usuário comum; `404` para alvo inexistente |
 | `POST /auth/reset-password/confirm` | público | `204` em caso de sucesso; `400` genérico para token inexistente, usado ou expirado; `429` no rate limit |
+| `GET /auth/password-reset/config` | público | `200` com `{ self_service: bool }` (só a configuração do servidor) |
+| `POST /auth/forgot-password` | público | `202` sempre com a mesma mensagem; `429` no rate limit |
 
 Corpo da confirmação:
 
 ```json
-{ "token": "<token recebido>", "new_password": "<6 a 128 caracteres>" }
+{ "token": "<token recebido>", "new_password": "<8 a 72 caracteres>" }
+```
+
+Corpo do pedido de recuperação:
+
+```json
+{ "email": "<e-mail da conta>" }
 ```
 
 O token em texto só aparece na resposta da geração. Ele não é gravado em log,
@@ -45,7 +55,7 @@ não é persistido e não aparece em nenhuma outra rota.
   SHA-256 hexadecimal (índice único).
 - Validade de 15 minutos, uso único e vínculo ao `user_id`.
 - Admin não pode gerar token para si mesmo por esta rota.
-- A política de senha é a mesma já usada no cadastro: 6 a 128 caracteres.
+- A política de senha é a mesma já usada no cadastro: 8 a 72 caracteres.
 - A resposta de falha é sempre `Token inválido ou expirado.`, sem revelar
   usuário, e-mail ou se o token existiu.
 - O rate limit por IP é o mesmo do endpoint público antigo (10 chamadas por
@@ -56,6 +66,27 @@ não é persistido e não aparece em nenhuma outra rota.
 - O endpoint público existente `POST /auth/reset-password` não foi alterado
   funcionalmente. Ele também passa a incrementar `token_version` ao trocar a
   senha.
+
+## Recuperação self-service (SMTP opcional)
+
+`GET /auth/password-reset/config` diz apenas se o servidor tem SMTP; a tela
+`#/forgot-password` usa isso para mostrar o formulário ou as instruções com o
+administrador.
+
+Com `SMTP_HOST`/`SMTP_FROM` definidos:
+
+1. `POST /auth/forgot-password` valida o rate limit por IP (o mesmo balde do
+   reset, 10 chamadas por 10 minutos).
+2. Se o e-mail existir, cria o token (hash no banco) e agenda o envio em segundo
+   plano — o tempo de resposta não denuncia se a conta existe.
+3. O e-mail traz o link `APP_PUBLIC_URL/#/reset-password?token=...` e o token em
+   texto, para o caso de o link falhar.
+4. Falha de SMTP é registrada como `password_reset_email_failed` **sem** e-mail,
+   token ou senha; a requisição continua respondendo `202`.
+
+Garantias: resposta idêntica para e-mail existente ou não; token nunca vai para
+log; um pedido novo invalida os tokens pendentes anteriores; sem SMTP nenhum
+token é gerado.
 
 ## Invalidação de sessões
 
@@ -135,9 +166,10 @@ de login admin, geração do token e redirecionamento 401 também foi exercitado
 
 ## Limitações e operação
 
-- Sem provedor de e-mail: a entrega do token é manual e depende do admin.
-- O admin não recupera a própria senha por esta rota; é necessário outro admin
-  ou o fluxo público existente.
+- Sem SMTP configurado, a recuperação por link fica desativada e a entrega do
+  token volta a ser manual (admin → usuário).
+- O admin não recupera a própria senha por esta rota; use
+  `python manage.py set-password --email ...` no servidor ou outro admin.
 - Rate limit em memória não é compartilhado entre múltiplos processos/instâncias.
 - A remoção da sessão Redis é best-effort; a invalidação efetiva é o
   `token_version` no banco.

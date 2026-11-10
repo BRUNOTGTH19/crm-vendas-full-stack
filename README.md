@@ -145,12 +145,31 @@ A PWA incluye `manifest.json`, ícono e `sw.js` (cache-first para estáticos, ne
 
 Registrate a partir da tela de login, ou usa o usuário `bruno@crm.com` (admin) já existente na base local.
 
-### Redefinição de senha com token
+### Redefinição de senha
 
-O admin gera um token de uso único (15 minutos) em **Administração → Dados e usuários**.
-O usuário confirma em `#/reset-password`. Qualquer troca de senha invalida os
-access e refresh tokens emitidos antes dela. Veja o fluxo completo, as decisões
-de segurança e o passo de migration no Render em
+Três caminhos, do mais simples ao de contingência:
+
+1. **Esqueci minha senha (self-service)** — em `#/forgot-password` o usuário
+   informa o e-mail e recebe um link/token de uso único (15 minutos) para
+   escolher a nova senha em `#/reset-password`. A resposta é sempre a mesma, com
+   ou sem conta cadastrada, e o envio roda em segundo plano.
+2. **Token gerado pelo admin** — **Administração → Dados e usuários** → *Gerar
+   token*. O usuário confirma em `#/reset-password` (a tela também aceita
+   `#/reset-password?token=...`, usado pelo link do e-mail).
+3. **Servidor** — `python manage.py set-password --email ...` no Render Shell,
+   para quando nem o e-mail nem o admin estão disponíveis.
+
+O self-service depende de SMTP configurado no backend: `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` e `APP_PUBLIC_URL`
+(URL do frontend usada no link). Sem essas variáveis a tela mostra as instruções
+do caminho 2/3 em vez do formulário — nada quebra. Use senha de aplicativo, não
+a senha do e-mail.
+
+Qualquer troca de senha invalida os access e refresh tokens emitidos antes dela.
+Os campos de senha (login, cadastro, redefinição e código de admin) têm o botão
+**mostrar/ocultar**, para o usuário conferir o que digitou antes de enviar.
+
+Veja as decisões de segurança e o passo de migration no Render em
 [`docs/password-reset-token.md`](docs/password-reset-token.md).
 
 ## Relatórios em PDF (doc 2.5)
@@ -324,6 +343,11 @@ Stack de hospedagem (todos gratuitos e sem cartão de crédito):
      diário compartilhados entre instâncias via `REDIS_URL`. Sem isso o limite é
      por processo; com Redis indisponível o backend volta para a memória em vez
      de derrubar o login.
+   - **(opcional)** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+     `SMTP_FROM`, `SMTP_STARTTLS` e `APP_PUBLIC_URL` — habilitam o link de
+     "Esqueci minha senha" por e-mail. `SMTP_PASSWORD` deve ser uma senha de
+     aplicativo do provedor, e `APP_PUBLIC_URL` é o domínio do frontend. Sem
+     elas o fluxo volta para o token do administrador.
    - **(opcional)** `ALLOW_DATABASE_RESET=false` — o padrão já é `false`: o botão
      "Zerar dados" responde 403 até você ligar a variável temporariamente.
    - **(opcional)** `ALLOW_LEGACY_PASSWORD_RESET=false` — o padrão já é `false`.
