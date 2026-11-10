@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError, setSession } from "../lib/api.ts";
 import type { TokenResponse } from "../types.ts";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { PasswordInput } from "../components/PasswordInput.tsx";
 import { IconReports } from "../components/icons.tsx";
 
 export function Login({ notice = "" }: { notice?: string }) {
@@ -74,9 +75,8 @@ export function Login({ notice = "" }: { notice?: string }) {
               <label className="label" htmlFor="login-password">
                 Senha
               </label>
-              <input
+              <PasswordInput
                 id="login-password"
-                type="password"
                 required
                 autoComplete="current-password"
                 value={password}
@@ -100,10 +100,16 @@ export function Login({ notice = "" }: { notice?: string }) {
             </button>
           </form>
 
-          {/* A redefinição por e-mail foi removida: qualquer pessoa que soubesse
-              o e-mail trocava a senha (A1). Agora o administrador gera um token
-              de uso único e o usuário confirma na tela abaixo. */}
+          {/* Recuperação: link por e-mail quando o servidor tem SMTP; sem SMTP,
+              a tela de "Esqueci minha senha" orienta a pedir um token ao admin.
+              A antiga troca de senha só com e-mail continua desligada (A1). */}
           <p className="mt-6 text-center text-sm leading-relaxed text-ink/70">
+            <a href="#/forgot-password" className={footerLink}>
+              Esqueci minha senha
+            </a>
+            <span aria-hidden className="mx-2 text-ink/40">
+              •
+            </span>
             <a href="#/reset-password" className={footerLink}>
               Tenho um token de redefinição
             </a>

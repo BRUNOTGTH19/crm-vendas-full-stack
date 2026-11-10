@@ -1,14 +1,22 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, confirmPasswordReset } from "../lib/api.ts";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { PasswordInput } from "../components/PasswordInput.tsx";
 import { IconReports } from "../components/icons.tsx";
 
+/** Token vindo do link do e-mail (`#/reset-password?token=...`). */
+function tokenFromUrl(): string {
+  const query = window.location.hash.split("?")[1] ?? "";
+  return new URLSearchParams(query).get("token")?.trim() ?? "";
+}
+
 /**
- * Tela pública para confirmar a redefinição com o token entregue pelo admin.
- * O token fica apenas no estado do componente — nunca no localStorage.
+ * Tela pública para confirmar a redefinição com o token entregue pelo admin
+ * ou pelo link do e-mail. O token fica apenas no estado do componente — nunca
+ * no localStorage.
  */
 export function ResetPasswordConfirm() {
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState(tokenFromUrl);
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState("");
@@ -99,9 +107,8 @@ export function ResetPasswordConfirm() {
                 <label htmlFor="reset-password" className="label">
                   Nova senha
                 </label>
-                <input
+                <PasswordInput
                   id="reset-password"
-                  type="password"
                   required
                   minLength={8}
                   maxLength={72}
@@ -116,9 +123,8 @@ export function ResetPasswordConfirm() {
                 <label htmlFor="reset-confirmation" className="label">
                   Confirmar nova senha
                 </label>
-                <input
+                <PasswordInput
                   id="reset-confirmation"
-                  type="password"
                   required
                   minLength={8}
                   maxLength={72}

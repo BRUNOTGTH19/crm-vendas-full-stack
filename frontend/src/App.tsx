@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout.tsx";
 import { AiChat } from "./components/AiChat.tsx";
 import { Login } from "./pages/Login.tsx";
 import { Register } from "./pages/Register.tsx";
+import { ForgotPassword } from "./pages/ForgotPassword.tsx";
 import { ResetPasswordConfirm } from "./pages/ResetPasswordConfirm.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
 import { Clients } from "./pages/Clients.tsx";
@@ -104,6 +105,7 @@ export function App(): ReactNode {
 
   if (!user) {
     if (route === "/register") return <Register />;
+    if (route === "/forgot-password") return <ForgotPassword />;
     if (route === "/reset-password") return <ResetPasswordConfirm />;
     return <Login notice={idleNotice} />;
   }

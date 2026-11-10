@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api.ts";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
+import { PasswordInput } from "../components/PasswordInput.tsx";
 import { IconReports } from "../components/icons.tsx";
 
 export function Register() {
@@ -86,9 +87,8 @@ export function Register() {
                 <label className="label" htmlFor="register-password">
                   Senha
                 </label>
-                <input
+                <PasswordInput
                   id="register-password"
-                  type="password"
                   required
                   minLength={8}
                   maxLength={72}

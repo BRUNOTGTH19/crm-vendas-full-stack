@@ -177,6 +177,16 @@ export function confirmPasswordReset(token: string, newPassword: string): Promis
   });
 }
 
+/** Diz se o servidor tem SMTP para enviar o link de recuperação. */
+export function passwordResetConfig(): Promise<{ self_service: boolean }> {
+  return api.get<{ self_service: boolean }>("/auth/password-reset/config");
+}
+
+/** Pede o link de recuperação. A resposta é genérica (não revela se existe). */
+export function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return api.post<{ message: string }>("/auth/forgot-password", { email });
+}
+
 /**
  * iOS/Safari ignora (ou abre em preview) o atributo `download` de blobs, e o
  * clique se perde — o usuário fica com a tela parada e nenhum PDF salvo. Nesses
