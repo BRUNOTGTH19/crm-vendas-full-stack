@@ -19,8 +19,13 @@ LOGIN_WINDOW_SECONDS = 300
 PASSWORD_RESET_MAX_ATTEMPTS = 10
 PASSWORD_RESET_WINDOW_SECONDS = 600
 
+# Limite por IP: 10 códigos de ativação de admin errados em 10 minutos.
+ADMIN_ACTIVATION_MAX_ATTEMPTS = 10
+ADMIN_ACTIVATION_WINDOW_SECONDS = 600
+
 _failures: dict[str, list[float]] = defaultdict(list)
 _reset_attempts: dict[str, list[float]] = defaultdict(list)
+_admin_attempts: dict[str, list[float]] = defaultdict(list)
 
 
 def _prune(store: dict[str, list[float]], key: str, now: float, window: float) -> None:
@@ -59,7 +64,21 @@ def record_password_reset(key: str, now: float | None = None) -> None:
     _reset_attempts[key].append(now)
 
 
+def is_admin_activation_blocked(key: str, now: float | None = None) -> bool:
+    """True quando o IP excedeu as tentativas de ativação na janela."""
+    now = time.monotonic() if now is None else now
+    _prune(_admin_attempts, key, now, ADMIN_ACTIVATION_WINDOW_SECONDS)
+    return len(_admin_attempts.get(key, ())) >= ADMIN_ACTIVATION_MAX_ATTEMPTS
+
+
+def record_admin_activation_failure(key: str, now: float | None = None) -> None:
+    now = time.monotonic() if now is None else now
+    _prune(_admin_attempts, key, now, ADMIN_ACTIVATION_WINDOW_SECONDS)
+    _admin_attempts[key].append(now)
+
+
 def reset_rate_limit() -> None:
     """Limpa contadores (usado pelos testes)."""
     _failures.clear()
     _reset_attempts.clear()
+    _admin_attempts.clear()

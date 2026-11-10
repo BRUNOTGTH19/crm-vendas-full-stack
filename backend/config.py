@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # liberar a área administrativa para a sua conta já cadastrada.
     admin_email: str = ""
 
+    # Alternativa de ativação: código secreto que o usuário logado digita no
+    # app para virar admin. Se vazio, o backend gera um código aleatório na
+    # primeira vez que alguém abre o app sem existir admin e o registra no log
+    # do servidor (Render/terminal). O código gerado é de uso único.
+    admin_setup_code: str = ""
+
     # --- Web Push (notificações de alerta de prazo de vendas) ---
     # Gere o par de chaves com: python gen_vapid_keys.py
     # A pública vai para o frontend (applicationServerKey); a privada fica aqui.

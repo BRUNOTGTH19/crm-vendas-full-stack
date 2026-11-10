@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from database import get_db
+from middleware.rate_limit import (
+    is_admin_activation_blocked,
+    record_admin_activation_failure,
+)
 from schemas.user import (
+    AdminActivationRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
     RefreshRequest,
@@ -14,6 +19,7 @@ from schemas.user import (
     UserResponse,
 )
 from services.auth_service import (
+    activate_admin,
     confirm_password_reset,
     get_current_user,
     login_user,
@@ -115,3 +121,32 @@ def me(
         return user
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.post("/activate-admin", response_model=UserResponse)
+def activate_admin_endpoint(
+    data: AdminActivationRequest,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+):
+    """Torna o próprio usuário logado administrador mediante código secreto.
+
+    O código vem de ``ADMIN_SETUP_CODE`` ou é gerado pelo backend e mostrado
+    **apenas no log do servidor** na primeira vez que o app é aberto sem admin.
+    """
+    ip = request.client.host if request.client else "unknown"
+    if is_admin_activation_blocked(ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+        )
+    try:
+        user = get_current_user(db, credentials.credentials)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        return activate_admin(db, user, data.code)
+    except ValueError as e:
+        record_admin_activation_failure(ip)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -8,6 +8,8 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from config import settings
+from models.app_setting import AppSetting
+from models.audit_log import AuditLog
 from models.password_reset_token import PasswordResetToken
 from models.user import User, UserRole
 from redis_client import redis_client
@@ -130,6 +132,77 @@ def _promote_bootstrap_admin(db: Session, user: User) -> bool:
     return True
 
 
+_ADMIN_CODE_KEY = "admin_setup_code"
+_ADMIN_CONSUMED_KEY = "admin_setup_consumed"
+
+
+def _setting(db: Session, key: str) -> str | None:
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    return row.value if row else None
+
+
+def _admin_exists(db: Session) -> bool:
+    return db.query(User.id).filter(User.role == UserRole.admin).first() is not None
+
+
+def ensure_admin_setup_code(db: Session) -> str | None:
+    """Gera (uma única vez) o código de ativação e o registra no log.
+
+    Só age quando ainda não existe administrador e ``ADMIN_SETUP_CODE`` não foi
+    definido. O código fica no banco (estável entre reinícios) e **nunca** é
+    devolvido pela API: quem tiver acesso ao log do servidor é que o lê.
+    """
+    if (settings.admin_setup_code or "").strip():
+        return None
+    # Caminho comum depois da ativação: uma única consulta barata e retorno.
+    if _admin_exists(db):
+        return None
+    if _setting(db, _ADMIN_CONSUMED_KEY) is not None:
+        return None
+    stored = _setting(db, _ADMIN_CODE_KEY)
+    if stored:
+        return stored
+
+    code = secrets.token_urlsafe(9)
+    db.add(AppSetting(key=_ADMIN_CODE_KEY, value=code))
+    db.commit()
+    logging.getLogger(__name__).warning(
+        "admin_setup_code_generated code=%s (Ativar acesso admin no app)", code
+    )
+    return code
+
+
+def activate_admin(db: Session, user: User, code: str) -> User:
+    """Promove o próprio usuário logado mediante o código de ativação.
+
+    Com ``ADMIN_SETUP_CODE`` definido, o código do operador permanece válido
+    (ele controla o segredo). Sem a variável, o código gerado é de uso único:
+    é apagado após a promoção e a ativação fica encerrada para os demais.
+    """
+    if user.role == UserRole.admin:
+        raise ValueError("Você já é administrador.")
+    # Encerra a ativação assim que existir um admin: ninguém mais entra por aqui.
+    if _admin_exists(db) or _setting(db, _ADMIN_CONSUMED_KEY) is not None:
+        raise ValueError("A ativação por código já foi utilizada.")
+
+    env_code = (settings.admin_setup_code or "").strip()
+    provided = (code or "").strip()
+    expected = env_code or _setting(db, _ADMIN_CODE_KEY) or ensure_admin_setup_code(db)
+    if not expected or not provided or not secrets.compare_digest(expected, provided):
+        raise ValueError("Código de ativação inválido.")
+
+    # Consome o código e registra que a ativação já foi usada.
+    db.query(AppSetting).filter(AppSetting.key == _ADMIN_CODE_KEY).delete()
+    db.add(AppSetting(key=_ADMIN_CONSUMED_KEY, value=str(user.id)))
+
+    user.role = UserRole.admin
+    db.add(AuditLog(user_id=user.id, action="admin_activated", detail=f"email={user.email}"))
+    db.commit()
+    db.refresh(user)
+    logging.getLogger(__name__).info("admin_activated user_id=%s", user.id)
+    return user
+
+
 def register_user(db: Session, data: UserCreate) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
@@ -238,6 +311,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
         raise ValueError("Credenciais inválidas")
 
     _promote_bootstrap_admin(db, user)
+    if user.role != UserRole.admin:
+        ensure_admin_setup_code(db)
 
     payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     access_token = create_access_token(payload, user.token_version)
@@ -294,4 +369,6 @@ def get_current_user(db: Session, token: str) -> User:
 
     # A consulta do usuário já era necessária; o "tv" é comparado na mesma linha.
     _promote_bootstrap_admin(db, user)
+    if user.role != UserRole.admin:
+        ensure_admin_setup_code(db)
     return user

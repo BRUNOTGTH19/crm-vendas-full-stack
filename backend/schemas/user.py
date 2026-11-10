@@ -18,6 +18,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class AdminActivationRequest(BaseModel):
+    """Código digitado no app para o usuário logado virar administrador."""
+
+    code: str = Field(min_length=1, max_length=256)
+
+
 class PasswordResetRequest(BaseModel):
     """Corpo do POST /auth/reset-password (redefinição simples, sem link/código).
 

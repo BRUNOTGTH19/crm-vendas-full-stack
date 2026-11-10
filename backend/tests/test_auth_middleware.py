@@ -17,7 +17,7 @@ def auth_client(monkeypatch):
     monkeypatch.setattr(settings, "jwt_secret_key", "isolated-test-key-not-for-production")
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
-        id=7, token_version=0
+        id=7, token_version=0, role="user"
     )
     app = FastAPI()
     app.dependency_overrides[get_db] = lambda: db
