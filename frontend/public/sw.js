@@ -1,8 +1,9 @@
 /* Service Worker: somente arquivos públicos estáticos são armazenados offline. */
-// v5: renomeado a cada mudança visível do app — o `activate` apaga os caches
+// v6: renomeado a cada mudança visível do app — o `activate` apaga os caches
 // antigos, senão o celular continuaria servindo um bundle velho (cache-first)
-// mesmo depois do deploy.
-const CACHE = "crm-vendas-cache-v5";
+// mesmo depois do deploy. v6 invalida o bundle anterior à correção do seletor
+// de tema (que aparecia estourando a borda da sidebar em navegadores com cache).
+const CACHE = "crm-vendas-cache-v6";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
