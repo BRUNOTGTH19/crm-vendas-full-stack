@@ -6,6 +6,7 @@ from threading import Lock
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+import redis
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -18,9 +19,38 @@ from services.push_service import send_push_to_all
 logger = logging.getLogger(__name__)
 _run_lock = Lock()
 
+# A17: uma execução agendada por dia, mesmo com vários processos/instâncias.
+# 26h cobrem o dia inteiro e uma possível virada de fuso; a chave inclui a data,
+# então o valor expirado apenas libera a chave do dia seguinte.
+REMINDER_LOCK_TTL_SECONDS = 26 * 3600
+
 
 class ReminderJobBusy(Exception):
     """Há uma execução no mesmo processo em andamento."""
+
+
+def _claim_daily_run(day: str) -> bool:
+    """Reserva a execução agendada do dia no Redis.
+
+    O lock local (``_run_lock``) só vale no processo atual; com mais de uma
+    instância o mesmo lembrete seria enviado uma vez por instância. ``SET NX``
+    é atômico e a chave por data dispensa liberação explícita.
+
+    Redis indisponível não bloqueia o job: o comportamento volta a ser o de
+    antes (um envio por processo), que é melhor do que não enviar nada.
+    """
+    from redis_client import redis_client
+
+    try:
+        claimed = redis_client.set(
+            f"reminder:lock:{day}", "1", nx=True, ex=REMINDER_LOCK_TTL_SECONDS
+        )
+    except redis.RedisError as exc:
+        logger.warning(
+            "reminder_lock_unavailable date=%s error_type=%s", day, type(exc).__name__
+        )
+        return True
+    return bool(claimed)
 
 
 def run_due_charges(*, user_id: int | None = None, dry_run: bool = False,
@@ -38,6 +68,16 @@ def run_due_charges(*, user_id: int | None = None, dry_run: bool = False,
             "timezone": settings.reminder_timezone, "sales_found": 0,
             "users_found": 0, "push_accepted": 0, "users_failed": 0,
         }
+        # Só o disparo automático diário é deduplicado entre instâncias. O
+        # admin pode querer reenviar manualmente; a prévia nunca notifica.
+        scheduled_run = source == "scheduled" and user_id is None and not dry_run
+        if scheduled_run and not _claim_daily_run(today.isoformat()):
+            logger.info(
+                "reminder_skipped run_id=%s reason=already_ran_today date=%s",
+                run_id, today.isoformat(),
+            )
+            result["skipped"] = "already_ran_today"
+            return result
         logger.info("reminder_started run_id=%s source=%s dry_run=%s user_id=%s cutoff=%s timezone=%s",
                     run_id, source, dry_run, user_id, cutoff, settings.reminder_timezone)
         with SessionLocal() as db:

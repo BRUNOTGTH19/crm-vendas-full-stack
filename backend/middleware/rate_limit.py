@@ -1,16 +1,29 @@
-"""Rate limiting em memória para o endpoint de login (anti força-bruta).
+"""Rate limiting para login, redefinição de senha, ativação de admin e IA.
 
-Contabiliza apenas tentativas **falhas** (HTTP 401) por endereço IP dentro de
-uma janela deslizante. Não depende de Redis e funciona com o processo único do
-servidor (uvicorn). Com vários workers/instâncias cada processo mantém seu
-próprio contador — ainda assim reduz o ataque de força bruta.
+Por padrão os contadores vivem na memória do processo: simples, sem
+dependências, e eficaz no servidor único (uvicorn). Com vários workers ou
+instâncias, cada processo teria seu próprio contador e o limite efetivo
+multiplicaria — por isso ``RATE_LIMIT_BACKEND=redis`` guarda as janelas em
+sorted sets no Redis, compartilhadas por todas as instâncias (A17).
+
+O Redis é best-effort: se ele cair, o contador volta para a memória em vez de
+derrubar o login. A janela continua sendo aplicada por processo.
 """
 from __future__ import annotations
 
+import logging
 import time
 from collections import defaultdict
+from uuid import uuid4
+
+import redis
 
 from config import settings
+from redis_client import redis_client
+
+logger = logging.getLogger(__name__)
+
+REDIS_PREFIX = "ratelimit:v1:"
 
 # Limite por IP: 15 falhas de login em 5 minutos.
 LOGIN_MAX_FAILURES = 15
@@ -35,6 +48,45 @@ _reset_attempts: dict[str, list[float]] = defaultdict(list)
 _admin_attempts: dict[str, list[float]] = defaultdict(list)
 _ai_messages: dict[str, list[float]] = defaultdict(list)
 
+_STORES: dict[str, dict[str, list[float]]] = {
+    "login": _failures,
+    "password_reset": _reset_attempts,
+    "admin_activation": _admin_attempts,
+    "ai": _ai_messages,
+}
+
+
+def _redis_backend() -> redis.Redis | None:
+    """Cliente Redis quando o backend compartilhado está ligado."""
+    if settings.rate_limit_backend != "redis":
+        return None
+    return redis_client
+
+
+def _redis_key(bucket: str, key: str) -> str:
+    return f"{REDIS_PREFIX}{bucket}:{key}"
+
+
+def _redis_count(client: redis.Redis, key: str, window: float, moment: float) -> int | None:
+    """Conta eventos na janela; ``None`` quando o Redis falha."""
+    try:
+        client.zremrangebyscore(key, 0, moment - window)
+        return int(client.zcard(key) or 0)
+    except redis.RedisError:
+        logger.warning("rate_limit_redis_unavailable op=count")
+        return None
+
+
+def _redis_add(client: redis.Redis, key: str, window: float, moment: float) -> bool:
+    """Registra um evento; ``False`` quando o Redis falha."""
+    try:
+        client.zadd(key, {f"{moment:.6f}:{uuid4().hex}": moment})
+        client.expire(key, int(window) + 60)
+        return True
+    except redis.RedisError:
+        logger.warning("rate_limit_redis_unavailable op=add")
+        return False
+
 
 def _prune(store: dict[str, list[float]], key: str, now: float, window: float) -> None:
     stamps = store.get(key)
@@ -46,43 +98,64 @@ def _prune(store: dict[str, list[float]], key: str, now: float, window: float) -
         store.pop(key, None)
 
 
+def _is_blocked(bucket: str, key: str, limit: int, window: float,
+                now: float | None = None) -> bool:
+    client = _redis_backend()
+    if client is not None:
+        moment = time.time() if now is None else now
+        count = _redis_count(client, _redis_key(bucket, key), window, moment)
+        if count is not None:
+            return count >= limit
+        # Redis indisponível: cai para a memória (o login não para por isso).
+    moment = time.monotonic() if now is None else now
+    store = _STORES[bucket]
+    _prune(store, key, moment, window)
+    return len(store.get(key, ())) >= limit
+
+
+def _record(bucket: str, key: str, window: float, now: float | None = None) -> None:
+    client = _redis_backend()
+    if client is not None:
+        moment = time.time() if now is None else now
+        if _redis_add(client, _redis_key(bucket, key), window, moment):
+            return
+    moment = time.monotonic() if now is None else now
+    store = _STORES[bucket]
+    _prune(store, key, moment, window)
+    store[key].append(moment)
+
+
 def is_login_blocked(key: str, now: float | None = None) -> bool:
     """True quando o IP excedeu o número de falhas na janela."""
-    now = time.monotonic() if now is None else now
-    _prune(_failures, key, now, LOGIN_WINDOW_SECONDS)
-    return len(_failures.get(key, ())) >= LOGIN_MAX_FAILURES
+    return _is_blocked("login", key, LOGIN_MAX_FAILURES, LOGIN_WINDOW_SECONDS, now)
 
 
 def record_login_failure(key: str, now: float | None = None) -> None:
-    now = time.monotonic() if now is None else now
-    _prune(_failures, key, now, LOGIN_WINDOW_SECONDS)
-    _failures[key].append(now)
+    _record("login", key, LOGIN_WINDOW_SECONDS, now)
 
 
 def is_password_reset_blocked(key: str, now: float | None = None) -> bool:
     """True quando o IP excedeu o número de redefinições na janela."""
-    now = time.monotonic() if now is None else now
-    _prune(_reset_attempts, key, now, PASSWORD_RESET_WINDOW_SECONDS)
-    return len(_reset_attempts.get(key, ())) >= PASSWORD_RESET_MAX_ATTEMPTS
+    return _is_blocked(
+        "password_reset", key, PASSWORD_RESET_MAX_ATTEMPTS,
+        PASSWORD_RESET_WINDOW_SECONDS, now,
+    )
 
 
 def record_password_reset(key: str, now: float | None = None) -> None:
-    now = time.monotonic() if now is None else now
-    _prune(_reset_attempts, key, now, PASSWORD_RESET_WINDOW_SECONDS)
-    _reset_attempts[key].append(now)
+    _record("password_reset", key, PASSWORD_RESET_WINDOW_SECONDS, now)
 
 
 def is_admin_activation_blocked(key: str, now: float | None = None) -> bool:
     """True quando o IP excedeu as tentativas de ativação na janela."""
-    now = time.monotonic() if now is None else now
-    _prune(_admin_attempts, key, now, ADMIN_ACTIVATION_WINDOW_SECONDS)
-    return len(_admin_attempts.get(key, ())) >= ADMIN_ACTIVATION_MAX_ATTEMPTS
+    return _is_blocked(
+        "admin_activation", key, ADMIN_ACTIVATION_MAX_ATTEMPTS,
+        ADMIN_ACTIVATION_WINDOW_SECONDS, now,
+    )
 
 
 def record_admin_activation_failure(key: str, now: float | None = None) -> None:
-    now = time.monotonic() if now is None else now
-    _prune(_admin_attempts, key, now, ADMIN_ACTIVATION_WINDOW_SECONDS)
-    _admin_attempts[key].append(now)
+    _record("admin_activation", key, ADMIN_ACTIVATION_WINDOW_SECONDS, now)
 
 
 def is_ai_blocked(key: str, now: float | None = None) -> bool:
@@ -90,20 +163,23 @@ def is_ai_blocked(key: str, now: float | None = None) -> bool:
     limit = settings.ai_max_messages_per_hour
     if limit <= 0:
         return False
-    now = time.monotonic() if now is None else now
-    _prune(_ai_messages, key, now, AI_WINDOW_SECONDS)
-    return len(_ai_messages.get(key, ())) >= limit
+    return _is_blocked("ai", key, limit, AI_WINDOW_SECONDS, now)
 
 
 def record_ai_message(key: str, now: float | None = None) -> None:
-    now = time.monotonic() if now is None else now
-    _prune(_ai_messages, key, now, AI_WINDOW_SECONDS)
-    _ai_messages[key].append(now)
+    _record("ai", key, AI_WINDOW_SECONDS, now)
 
 
 def reset_rate_limit() -> None:
     """Limpa contadores (usado pelos testes)."""
-    _failures.clear()
-    _reset_attempts.clear()
-    _admin_attempts.clear()
-    _ai_messages.clear()
+    for store in _STORES.values():
+        store.clear()
+    client = _redis_backend()
+    if client is None:
+        return
+    try:
+        keys = list(client.scan_iter(match=f"{REDIS_PREFIX}*"))
+        if keys:
+            client.delete(*keys)
+    except redis.RedisError:
+        logger.warning("rate_limit_redis_unavailable op=reset")

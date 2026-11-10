@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Cada mensagem pode gerar várias chamadas ao provedor; 0 desabilita a IA.
     ai_max_messages_per_hour: int = Field(default=30, ge=0, le=1000)
 
+    # Onde os contadores de rate limit vivem (A17 da auditoria).
+    # "memory": um contador por processo (padrão, sem dependências).
+    # "redis": contador compartilhado entre instâncias; com Redis indisponível
+    # o limite volta para a memória em vez de derrubar o login.
+    rate_limit_backend: str = "memory"
+
     # Origens permitidas no CORS, separadas por vírgula. "*" libera todas
     # (adequado para um app público sem cookies). Nunca combine "*" com
     # credenciais: o token viaja no header Authorization, não em cookie.
@@ -77,6 +83,14 @@ class Settings(BaseSettings):
     def valid_reminder_timezone(cls, value: str) -> str:
         ZoneInfo(value)
         return value
+
+    @field_validator("rate_limit_backend")
+    @classmethod
+    def valid_rate_limit_backend(cls, value: str) -> str:
+        normalized = (value or "memory").strip().lower()
+        if normalized not in {"memory", "redis"}:
+            raise ValueError("RATE_LIMIT_BACKEND deve ser 'memory' ou 'redis'.")
+        return normalized
 
     # --- Cobrança / WhatsApp (100% grátis, sem API paga) ---
     # Nome exibido no rodapé da mensagem de cobrança.
