@@ -86,9 +86,10 @@ def reset_database(
 ):
     """Zera os dados do ambiente. Exige ``confirm: true`` no corpo.
 
-    A ação é controlada pela flag ``ALLOW_DATABASE_RESET`` (opt-out, ligada
-    por padrão). Anteriormente o reset era bloqueado em produção, o que
-    impedia o administrador de zerar os dados no ambiente de uso real.
+    A ação é controlada pela flag ``ALLOW_DATABASE_RESET`` (opt-in, desligada
+    por padrão). Ligue ``ALLOW_DATABASE_RESET=true`` apenas enquanto a operação
+    de zerar os dados for necessária e desligue em seguida: um administrador
+    comprometido não consegue apagar a base sem essa variável.
     """
     if not settings.allow_database_reset:
         raise HTTPException(
@@ -146,9 +147,13 @@ def import_database(
             detail=f"Arquivo inválido: {exc.error_count()} erro(s) de validação.",
         ) from exc
     except Exception as exc:
+        # A14: não ecoa a exceção interna (caminho, driver, detalhe do parser).
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Não foi possível ler o arquivo: {exc}",
+            detail=(
+                "Não foi possível ler o arquivo. Envie um JSON exportado "
+                "por este CRM."
+            ),
         ) from exc
 
     try:

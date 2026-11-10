@@ -249,6 +249,25 @@ def test_import_invalid_file_is_rejected(admin_headers):
     assert r.status_code == 422
 
 
+def test_import_does_not_leak_internal_error(admin_headers, monkeypatch):
+    """A14: falha inesperada ao ler o arquivo não expõe detalhe interno."""
+    from schemas.admin import ExportPayload
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("internal path /srv/app/secret.py")
+
+    monkeypatch.setattr(ExportPayload, "model_validate_json", explode)
+    r = client.post(
+        "/admin/database/import",
+        files={"file": ("export.json", b"{}", "application/json")},
+        headers=admin_headers,
+    )
+
+    assert r.status_code == 400
+    assert "secret.py" not in r.text
+    assert "internal path" not in r.text
+
+
 def test_export_logs_audit(admin_headers):
     before = _count_action("database_export")
     client.get("/admin/database/export", headers=admin_headers)
