@@ -376,14 +376,26 @@ pelo cabeçalho antes de substituir o anterior.
 
 O Render não tem cron no plano gratuito, então quem agenda é o GitHub:
 
-1. **Settings → Secrets and variables → Actions → New repository secret**
-2. Nome `DATABASE_URL`, valor `mysql+pymysql://user:senha@host:porta/banco`
-   (o mesmo do Render, com permissão de leitura nas tabelas)
-3. O workflow `.github/workflows/backup.yml` roda todo dia às **03:00**
+1. Crie um usuário MySQL **só de leitura** para o backup (não use o da
+   aplicação): rode `backend/sql/create_backup_user.sql` com um administrador
+   do banco, trocando a senha e o nome do banco. Ele recebe apenas
+   `SELECT, SHOW VIEW, TRIGGER, EVENT` no banco e `SHOW_ROUTINE` global — o
+   suficiente para `mysqldump` exportar tabelas, views, triggers e procedures, e
+   **insuficiente para escrever, apagar ou criar bancos**.
+2. **Settings → Secrets and variables → Actions → New repository secret**
+3. Nome `DATABASE_URL`, valor `mysql+pymysql://crm_backup:senha@host:porta/banco`
+   (URL do usuário criado no passo 1, não a do Render)
+4. O workflow `.github/workflows/backup.yml` roda todo dia às **03:00**
    (America/Sao_Paulo) e também em **Actions → Backup MySQL → Run workflow**
-4. Cada execução publica o dump como artifact por **14 dias** (retenção do
+5. Cada execução publica o dump como artifact por **14 dias** (retenção do
    próprio GitHub). O Render apaga o disco a cada deploy, então nunca guarde o
    dump só lá.
+
+Segurança do secret: ele é cifrado, mascarado nos logs e não é enviado para
+execuções de PR de forks. Ainda assim, **o dump contém dados dos clientes**:
+mantenha o repositório privado ou remova o passo de upload e guarde o arquivo em
+um storage privado. Nunca coloque a `DATABASE_URL` em arquivo versionado — o
+`backend/.env` fica fora do Git.
 
 Sem o secret o workflow não falha: ele registra um aviso e encerra, para não
 poluir o histórico antes da configuração.
@@ -411,7 +423,9 @@ python restore_mysql.py \
 - O comando **recusa** restaurar no banco da `DATABASE_URL`: para promover uma
   restauração, valide em outro banco e troque manualmente.
 - O botão **Run workflow** do GitHub Actions aceita `restore_check` para rodar
-  essa validação na nuvem (o usuário do banco precisa de `CREATE DATABASE`).
+  essa validação na nuvem — mas o usuário de backup **não** tem `CREATE
+  DATABASE`, então na prática rode a validação localmente (ou use
+  temporariamente um usuário com permissão de escrita).
 
 Fluxo seguro para recuperar um incidente: restaure em um banco novo, confira as
 tabelas e os totais, aponte a `DATABASE_URL` para ele (ou copie as tabelas via
