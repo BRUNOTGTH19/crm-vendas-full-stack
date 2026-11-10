@@ -13,7 +13,7 @@ import pytest
 
 from backup_mysql import (
     BackupError,
-    _client_config,
+    client_config,
     create_backup,
     dump_arguments,
     dump_filename,
@@ -48,7 +48,7 @@ def test_client_config_keeps_password_only_in_the_file():
     from sqlalchemy.engine import make_url
 
     url = make_url("mysql+pymysql://user:senha@db.example:3306/crm")
-    config = _client_config(url)
+    config = client_config(url)
     assert "host=db.example" in config
     assert "user=user" in config
     assert "password=senha" in config

@@ -48,7 +48,7 @@ def dump_filename(now: datetime | None = None) -> str:
     return f"{DUMP_PREFIX}{now:%Y%m%d-%H%M%S}{DUMP_SUFFIX}"
 
 
-def _client_config(url: URL) -> str:
+def client_config(url: URL) -> str:
     """Conteúdo do ``--defaults-extra-file`` (senha fora de argv/env)."""
     lines = ["[client]"]
     if url.host:
@@ -78,7 +78,7 @@ def dump_arguments(config_path: str, database: str) -> list[str]:
     ]
 
 
-def _validate_dump(path: Path) -> None:
+def validate_dump(path: Path) -> None:
     """Confere se o gzip abre e começa com o cabeçalho do mysqldump."""
     try:
         with gzip.open(path, "rb") as handle:
@@ -138,7 +138,7 @@ def create_backup(
             with tempfile.NamedTemporaryFile(
                 "w", suffix=".cnf", delete=False, encoding="utf-8"
             ) as config_file:
-                config_file.write(_client_config(url))
+                config_file.write(client_config(url))
                 config_path = config_file.name
             os.chmod(config_path, 0o600)
             dump_cmd = dump_arguments(config_path, url.database or "")
@@ -157,7 +157,7 @@ def create_backup(
 
         with gzip.open(temporary, "wb") as output:
             output.write(completed.stdout)
-        _validate_dump(temporary)
+        validate_dump(temporary)
         temporary.replace(target)
     except Exception:
         temporary.unlink(missing_ok=True)
